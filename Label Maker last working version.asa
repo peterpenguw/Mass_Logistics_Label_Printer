@@ -1,0 +1,2421 @@
+Option Base 1
+
+'NEw 2016 unqiue items function
+Function UniqueItems(ArrayIn, Optional Count As Variant) As Variant
+'   Accepts an array or range as input
+'   If Count = True or is missing, the function returns the number of unique elements
+'   If Count = False, the function returns a variant array of unique elements
+    Dim Unique() As Variant ' array that holds the unique items
+    Dim Element As Variant
+    Dim i As Integer
+    Dim FoundMatch As Boolean
+'   If 2nd argument is missing, assign default value
+    If IsMissing(Count) Then Count = True
+'   Counter for number of unique elements
+    NumUnique = 0
+'   Loop thru the input array
+    For Each Element In ArrayIn
+        FoundMatch = False
+'       Has item been added yet?
+        For i = 1 To NumUnique
+            If Element = Unique(i) Then
+                FoundMatch = True
+                Exit For '(exit loop)
+            End If
+        Next i
+AddItem:
+'       If not in list, add the item to unique list
+        If Not FoundMatch And Not IsEmpty(Element) Then
+            NumUnique = NumUnique + 1
+            ReDim Preserve Unique(NumUnique)
+            Unique(NumUnique) = Element
+        End If
+    Next Element
+'   Assign a value to the function
+    If Count Then UniqueItems = NumUnique Else UniqueItems = Unique
+End Function
+
+'WHAT TO DO WHEN SHIFTING COLUMNS:  Last noted Feb 2016
+' Update sunZero wedZero formulas in CODE column B
+' Ctrl F all Hard Code text and review carefully
+
+
+
+Function colBasedOnTitle(ws As String, sTitle As String) As Integer  ' Added Jan 17th to extract the col of any header! SO SMART MAN
+Dim cell As Range
+Dim sTemp, sCell As String
+Dim i As Integer
+i = 1
+
+Do While CStr(Worksheets(ws).Cells(1, i).Value) <> vbNullString Or i < 170 'check at least 170 columns, when oever 170 and there is a blank cell, call the search off
+
+If CStr(Worksheets(ws).Cells(1, i).Value) = sTitle Then
+    colBasedOnTitle = i
+    sTemp = "match found"
+End If
+i = i + 1
+
+Loop
+
+If sTemp <> "match found" Then
+    MsgBox ("The [ " & sTitle & " ] column in the sheet [ " & ws & " ] could not be located, please do not change column titles. Please change title back or contact Akitasoft.com")
+End If
+
+End Function
+
+Function oStart(left As String) As Integer  ' Added extract the col of the start of the order field by inputing the name of the field to the left, "temp notes"
+oStart = colBasedOnTitle("ORDERS", left) + 1
+End Function
+
+Function oEnd(right As String) As Integer  ' Added extract the col of the end of the order field by inputing the name of the filed to the right, "TOTAL"
+oEnd = colBasedOnTitle("ORDERS", right) - 1
+End Function
+
+Function showOnlyNames(rng As Range) As Variant ' Added Jan 17th to extract the name from any range of cells.  Just used for data cleaning
+Dim cell As Range
+Dim sTemp, sCell As String
+Dim vFirstChar, vTag As Variant
+sTemp = ""
+
+For Each cell In rng
+    sCell = cell.Value
+    vFirstChar = left(sCell, 1)
+    vTag = left(sCell, 3)
+    
+    If IsNumeric(vFirstChar) = False And vTag <> "(S)" Then
+            sTemp = sTemp + sCell + " "
+    End If
+Next
+
+showOnlyNames = sTemp
+
+End Function
+
+Function showOnlyNumbs(rng As Range) As Variant ' Added Jan 17th to extract the phone number from any range of cells
+Dim cell As Range
+Dim sTemp, sCell As String
+Dim vFirstChar As Variant
+sTemp = ""
+
+For Each cell In rng
+    sCell = cell.Value
+    vFirstChar = left(sCell, 1)
+    
+    If IsNumeric(vFirstChar) Then
+            sTemp = sTemp + sCell + " "
+    End If
+Next
+
+showOnlyNumbs = sTemp
+
+End Function
+
+Function FontColor(CellColor As Range) ' Added Jan 10 -- to temp get font colors quickly
+FontColor = CellColor.Font.ColorIndex
+End Function
+
+Function paidCOD(rng As Range) As Boolean ' Added Jan 10th -- function to see if COD is green
+
+Dim color As Integer 'getting the color index
+color = rng.Font.ColorIndex
+
+paidCOD = False
+Select Case color
+   Case 14, 24, 10, 56, 12, 48, 43, 12, 15, 35, 19  ' ALL GREEN AND BACK COLORS = DO NOT PRINT.  from Andrei comp, I see 14, 48, 43, 56, 12, 35, 19 as greens.
+      paidCOD = True 'then yes, customer has paid cash on deliver (COD)
+   End Select
+
+
+End Function
+
+Function IsNum(data As Variant) ' Added Jan 5 11PM PETER PENG
+' checks if it's a number.. DOES NOT guard against false positives like 45,50
+If IsNumeric(data) Then
+IsNum = True
+Else
+IsNum = False
+End If
+
+End Function
+
+Function CheckNumStickers(n As String) As Integer
+'this works by looping down the driver column until the driver changes... however,
+'SOME STICKERS MAY BE BLANK IF NO ORDER ON THAT DAY
+Dim i As Integer
+i = 1
+
+
+Dim colDriver2 As Integer
+colDriver2 = colBasedOnTitle("ORDERS", " Driver")
+
+Dim a, B As String
+a = ActiveCell(i, colDriver2).Value
+B = ActiveCell(i + 1, colDriver2).Value
+
+Do While a = B
+    i = i + 1
+    a = ActiveCell(i, colDriver2).Value
+    B = ActiveCell(i + 1, colDriver2).Value
+Loop
+
+
+CheckNumStickers = i
+
+End Function
+
+Function CheckWsNameDup(n As String) As Boolean
+  
+  '1.2 Function to check if a ws.Name already exisits
+
+  CheckWsNameDup = False
+  For Each ws In Worksheets
+    If n = ws.Name Then
+      CheckWsNameDup = True
+      Exit Function
+    End If
+  Next ws
+  
+End Function
+
+
+
+
+Sub LabelMaker()
+'
+' Macro4 Macro ----------------- START BY the LABEL BUTTON ---------------------------------------------
+'
+       ActiveCell.Select 'select the activated cell
+       
+' 0 Batch get column numbers from Clients tab
+
+Dim colDrop, colTimeofD, colAllergiesNotes1, colFULLNAME, colPhone, colTag, colAddressLine1, colIntersection, colAllergiesNotes2, colSun, colWed As Integer
+Dim colWedSPEC, colSunSPEC, colCOD, colDriver As Integer
+Dim colPostal, colUnit, colCity As Integer
+
+colDrop = colBasedOnTitle("ORDERS", "Drop") 'updated Feb 2016
+colTimeofD = colBasedOnTitle("CLIENTS", "Time of D")
+colAllergiesNotes1 = colBasedOnTitle("CLIENTS", "Allergies, Notes 1")
+colFULLNAME = colBasedOnTitle("CLIENTS", "Full Name")
+colPhone = colBasedOnTitle("CLIENTS", "Phone")
+colDriver = colBasedOnTitle("ORDERS", " Driver")
+'colSub = colBasedOnTitle("CLIENTS", "Sub")
+colAddressLine1 = colBasedOnTitle("CLIENTS", "STREET NUMBER AND NAME")
+colUnit = colBasedOnTitle("CLIENTS", "Unit")
+colPostal = colBasedOnTitle("CLIENTS", "POSTAL CODE")
+colCity = colBasedOnTitle("CLIENTS", "CITY")
+colIntersection = colBasedOnTitle("CLIENTS", "Intersection")
+colAllergiesNotes2 = colBasedOnTitle("CLIENTS", "Allergies, Notes 2")
+
+colSun = colBasedOnTitle("ORDERS", "sun")
+colWed = colBasedOnTitle("ORDERS", "wed")
+colSunSPEC = colBasedOnTitle("ORDERS", "sSPEC")
+colWedSPEC = colBasedOnTitle("ORDERS", "wSPEC")
+colCOD = colBasedOnTitle("ORDERS", "COD")
+
+Dim colBagsLastWeek, colBagsThisWeek As Integer
+colBagsLastWeek = colBasedOnTitle("CLIENTS", "Bags Tot Last Week")
+colBagsThisWeek = colBasedOnTitle("CLIENTS", "Bags Tot This Week")
+
+'1. Check if right cell is selected  ---- General pre-start error check -- else exit sub
+If ActiveCell.Column <> 1 Then
+    MsgBox "Please make sure you have a Client ID (first column) selected to start"
+    Exit Sub
+End If
+
+'BUG SCANNER for forumlas, hidden rows, totals---------------
+
+Dim Formula As String
+Dim r, c, iBug, LastClientRow, NumbOfFormulaedCols As Integer
+LastClientRow = GetLastClientRow ' got the bottom row that captures all client orders
+NumbOfFormulaedCols = 11  'hard code the # of columns that you want checked
+
+Dim colsWithFormulas() As Integer 'make arry
+ReDim colsWithFormulas(1 To NumbOfFormulaedCols) ' redim arry
+
+
+' formulaed cell cols are  6 to 12, 48 to 50, 53 to 61
+colsWithFormulas(1) = colBasedOnTitle("ORDERS", "Bags Total")
+colsWithFormulas(2) = colBasedOnTitle("ORDERS", "sun")
+colsWithFormulas(3) = colBasedOnTitle("ORDERS", "wed")
+colsWithFormulas(4) = colBasedOnTitle("ORDERS", "TOTAL")
+colsWithFormulas(5) = colBasedOnTitle("ORDERS", "sTOT")
+colsWithFormulas(6) = colBasedOnTitle("ORDERS", "wTOT")
+colsWithFormulas(7) = colBasedOnTitle("ORDERS", "prog1")
+colsWithFormulas(8) = colBasedOnTitle("ORDERS", "prog2")
+colsWithFormulas(9) = colBasedOnTitle("ORDERS", "sunZero")
+colsWithFormulas(10) = colBasedOnTitle("ORDERS", "wedZero")
+colsWithFormulas(11) = colBasedOnTitle("ORDERS", "AllZero")
+
+
+'THIS HAS TO MATCH THE ARRAYS TOTAL NUMBER, see lines above!!!
+
+Dim FirstLetter, CellVal As String
+Dim CheckedRows As Boolean
+For r = 3 To LastClientRow 'ignore header and Promo row'
+
+If CheckedRows = False Then
+    If Rows(r).Hidden = True Then 'ALSO CHECK HIDDEN ROWS
+        MsgBox ("HEADS UP:  Row [ " + CStr(r) + " ] is hidden.  This is a normal part of using Filters (from Row 1 Drop Down Arrow).")
+        CheckedRows = True 'so we only check once
+    End If
+End If
+
+
+For c = 1 To NumbOfFormulaedCols
+
+    CellVal = Cells(r, colsWithFormulas(c)).Formula
+    FirstLetter = left(CStr(CellVal), 1)
+
+    If FirstLetter <> "=" Then
+        MsgBox ("ERROR: the formula is missing at [ " + ConvertToLetter(colsWithFormulas(c)) + CStr(r) + " ] Column #" + CStr(colsWithFormulas(c)) + ".  Please inspect.   As a precaution, you may also want to inspect the entire row's formulas and hidden formulas (found to the right of Warnings columns).    PS. to fix missing formulas, copy over a forumla from above or below the cell with the missing formula.")
+        Exit Sub
+    End If
+    Next 'row
+Next 'col
+
+'ALSO CHECK TOTAL SUMMATIONS:
+'Dim colTOTAL, rowTOTALSstart, rowTOTALSend As Integer 'Totals column
+
+'colTOTAL = colBasedOnTitle("ORDERS", "TOTAL")
+'colTOTAL1 = colTOTAL + 1
+'rowTOTALSstart = LastClientRow + 2 'move down 2 cells
+'rowTOTALSend = LastClientRow + 5 ' move down 6 cells but minus 1 for the loop below
+
+
+'Dim rr As Integer
+'For rr = rowTOTALSstart To rowTOTALSend 'scan each summnation cell
+ '   If Cells(rr, colTOTAL).Value <> Cells(rr + 1, colTOTAL).Value Then
+  '      MsgBox ("ERROR: totals not matching at summation checks at the bottom of your sheet.  Please inspect.  Mismatched detecte on row " + CStr(rr))
+   '     Exit Sub
+   ' End If
+'Next rr 'row
+
+
+
+' Check if someone did not select the top row
+If ActiveCell.Offset(-1, colDriver - 1).Value = ActiveCell.Offset(0, colDriver - 1).Value Then
+                If MsgBox("WARNING: it looks like you didn't select the first row of the drivers list, continue?", vbYesNo) = vbNo Then
+                    Exit Sub
+                End If
+End If
+
+If ActiveCell.Row < 3 Then
+    MsgBox "Please do not make labels for the first and second row, that doesn't make sense :)"
+    Exit Sub
+End If
+
+If ActiveCell.Worksheet.Name <> "ORDERS" Then
+    MsgBox "Please make sure you are in the ORDERS tab.  Remember to select the top Client ID cell and the program will 'waterfall' down until the driver changes"
+    Exit Sub
+End If
+
+If Application.WorksheetFunction.VLookup(ActiveCell, Worksheets("CLIENTS").Range("A:A"), 1) <> ActiveCell Then
+    MsgBox "This Client ID is not on your CLIENTS database."
+    Exit Sub
+End If
+
+'Check if user added a column
+'If Range("AU:1") <> "TOTAL" Then ' HARD CODE change when changing columns
+ '   MsgBox "WARNING - It looks like you've added or deleted a column, please revert back to a previous version or contact Akitasoft"
+  '  Exit Sub
+'End If
+
+'Check if it's a Wednesday, sunday, or all sheet
+' Grab the colum numbers of A1A and A1B
+Dim tempNotesCol, i, sC1col, wC1col As Integer
+tempNotesCol = colBasedOnTitle("ORDERS", "temp notes") 'hard code for temp notes header
+sC1col = tempNotesCol + 1 'if one column to the right of "temp notes" is not hidden, then it must be sunday bc it's right beside it
+wC1col = tempNotesCol + 17 'otherwise, check the first column that is a wednesday column
+'later, this code will check if it's hidden or not to determine SUN vs WED
+
+'Check for sunday or wed
+' REMOVE FOR NOW TO SPEED UP BULK ORDER CODE March  10 2017 - BULK ORDER FEATURE
+
+Dim SunOrWed As String ' DO NOT REMOVE THIS CODE
+If Columns(sC1col).EntireColumn.Hidden = False And Columns(wC1col).EntireColumn.Hidden = False Then 'both wed and sun sheets are open
+    MsgBox "Please convert to either a Sunday or Wednesday sheet before making labels"
+    Exit Sub
+ElseIf Columns(sC1col).EntireColumn.Hidden = False And Columns(wC1col).EntireColumn.Hidden = True Then ' it's a sunday sheet
+    SunOrWed = "Sunday"
+ElseIf Columns(sC1col).EntireColumn.Hidden = True And Columns(wC1col).EntireColumn.Hidden = False Then
+    SunOrWed = "Wednesday"
+Else
+    MsgBox "Something is not right; it looks like the columns have been shifted all out of place. Please double check your labels"
+End If
+
+
+
+'1.1 Checking number of stickers
+Dim NumStickers As Integer
+NumStickers = CheckNumStickers(ActiveCell.Address)
+
+'1.2 Anchor the original activecell
+Range(ActiveCell.Address).Name = "StartCell"  ' Gives for example ORDERS!$A$2, I DONT KNOW HOW THIS LINE WORKS
+
+'1.3 full recalc
+
+Application.CalculateFullRebuild
+
+
+'2. make new worksheet, name it after driver
+Dim ws As Worksheet
+Dim wsName As String
+Dim tDriver As String
+' handling multiple tabs
+Dim wsSuffix As Integer
+wsSuffix = 0
+' taking the driver as tab name
+tDriver = ActiveCell.Offset(0, colDriver - 1).Value 'grab driver name
+wsName = tDriver
+
+'if tab name already taken, this loops until it gets a new tab name
+    Do
+        If CheckWsNameDup(wsName) Then
+            wsSuffix = wsSuffix + 1
+                
+                If wsSuffix >= 2 Then 'delete suffix from last time if it's pass 2nd tab
+                    wsName = left(wsName, Len(wsName) - 1)
+                End If
+            
+            'adding the name with a suffix
+            wsName = wsName + CStr(wsSuffix)
+                        
+        End If
+    Loop Until CheckWsNameDup(wsName) = False
+
+    If wsSuffix = 100 Then
+            MsgBox "Got 99 tabs but a bitch aint one, if you having to many tabs plz delete some son"
+    End If
+
+' Show labels overview message to point to new tab
+' wsName is the final worksheet name
+
+'finally adding a ws as an object -   ADJUST CELL HEIGHT AND WIDTH HERE -------------------------
+Set ws = ThisWorkbook.Sheets.Add()
+ws.Name = wsName
+ws.Columns("A:B").ColumnWidth = 25.6
+ws.Columns("C").ColumnWidth = 3.7
+ws.Columns("D:E").ColumnWidth = 25.6
+ws.Rows.RowHeight = 13.21
+ws.Tab.color = 6 ' black?
+
+
+'Page setup stuff  ------------- TAB SETUP -------------------------
+With ws.PageSetup
+    .Orientation = xlPortrait
+    .Zoom = 90
+    .FirstPageNumber = 2
+    .PaperSize = xlPaperLetter
+    .LeftMargin = Application.CentimetersToPoints(0.9)
+    .RightMargin = Application.CentimetersToPoints(0.3)
+    .TopMargin = Application.CentimetersToPoints(1.7)
+    .BottomMargin = Application.CentimetersToPoints(0.7)
+    .HeaderMargin = Application.InchesToPoints(0.1)
+    .FooterMargin = Application.InchesToPoints(0.1)
+    .PrintGridlines = False
+    
+    '    .TopMargin = Application.CentimetersToPoints(1.5) old margins..
+   '  .BottomMargin = Application.CentimetersToPoints(0.9)
+End With
+
+'2.2 make a SECOND worksheet, name it after driver2 for addresses / route mapping - ADDRESS TAB
+'removed
+
+'Page setup stuff  ------------- TAB SETUP FOR ROUTE MAP TAB-------------------------
+'REMOVED
+
+
+'go back to startcell
+Application.Goto "StartCell"
+
+' 3. Make left array
+Dim L() As String
+ReDim L(1 To 10, 1 To NumStickers * 3) As String
+
+' 3.1 Make 1 x 10 array called "oneBy30"  ****** ORIGINAL LABEL MAKER SECTION
+
+Dim oneByTen(1 To 10), oneBy30(1 To 30) As String
+Dim oCodeTempStore, oCodeTempStore1stRow, oCodeTempStore2ndRow As String
+Dim rng, cell, rngCOD As Range ' create loop to read each column, make a rng object and set it
+Dim rngTemp As String ' not sure but try it
+
+' **************************************************
+' IMPORTANT RNG : this captures the order field
+' **************************************************
+Set rng = Range(Cells(1, oStart("temp notes")), Cells(1, oEnd("TOTAL"))) ' for Order Fields - review this when adding columns -
+'this should capture all the boxname row items ' CHANGE THIS IF ANDREI ADDS NEW MEAL - hard code
+'this is rather Dynamic and usues Temp Notes and TOTAL to frame the range
+
+Dim COD As String
+Dim iSpecialMealCol As Integer
+Dim sSpecial As String
+Dim EmptyOrderCount, ZeroOrderHeadsUp As Integer
+Dim clientID, clientIDrow As Integer
+Dim xL, yL, iClientCol As Integer
+
+
+
+
+
+
+' 3.3  -  Bag _ of _ feature   Feb 16 2015, further updated 2019
+
+
+' 3.3.1 Create and pop and array with the iBag value, by looping from top to bottom.  Since it's based on cell values, it does NOT need a buffer
+Dim iB As Integer
+Dim iBag() As Integer
+ReDim iBag(1 To NumStickers) As Integer
+
+Dim iBtemp As Integer
+iBtemp = 0
+
+For iB = 1 To NumStickers 'iB is the row that this loop waterfalls down on, it is dictated by the same driver
+        
+        'get the actual ROW that the same client ID is in
+        clientIDrow = ActiveCell.Offset(iB - 1, 0).Row
+        
+        EmptyOrderCount = 1
+        If SunOrWed = "Sunday" Then
+            EmptyOrderCount = Cells(clientIDrow, colSun).Value 'take how many meals ordered on Sun
+        ElseIf SunOrWed = "Wednesday" Then
+            EmptyOrderCount = Cells(clientIDrow, colWed).Value 'take how many meals ordered on Wed
+        End If
+    
+        'Make sure we are doing non zeros
+        If EmptyOrderCount <> 0 Then
+            ' if top AND bot pairs do not match eachother, then it's obivously a unique client, thus, bag 1
+            If Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                iBag(iB) = 1
+            ' if top pairs match, but bot pairs do not, it's the bottom of a  1 2 3 4 5 6 chain ( as an example).
+            ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                iBtemp = iBtemp + 1
+                iBag(iB) = iBtemp  ' so if the previous iB had a value of  2, then now this row has 3
+                iBtemp = 0 'it's at the end of the temp counter, reset counter
+                
+             ' if top pairs do NOT match, but bot pairs match, it's the top of a  1 2 3 4 5 6 chain.  Start the counter at 1
+            ElseIf Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                iBtemp = 1
+                iBag(iB) = iBtemp
+        
+             ' if both top and bot pairs match, we are in the middle of that 123456 chain, climbing from top to bottom
+            ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                iBtemp = iBtemp + 1
+                iBag(iB) = iBtemp
+            End If
+            
+        Else
+            iBag(iB) = 0 'if the first row is a 0 order then it's a 0
+        End If 'end of the statement that populates the iBag array
+
+Next iB ' iB  ... end of loop that figures out the Bag Numbers
+
+iBtemp = 0
+' Array iBag(1 to NumStickers) is now populated!
+
+'  3.3.2 Time to pop iBagT() ; the total number of bags for this client
+Dim iT As Integer
+Dim iTotBags() As Integer
+ReDim iTotBags(1 To NumStickers) As Integer ' same size as iBag()
+
+For iT = NumStickers To 1 Step -1 ' Reverse loop aww yea.  Climbing from bottom to top to catch the largest number in a 12345 bag sequence
+
+        'get the actual ROW that the same client ID is in
+        clientIDrow = ActiveCell.Offset(iT - 1, 0).Row
+            
+            If iBag(iT) <> 0 Then
+
+            ' if top and bot pairs DO NOT match eachother, then it's obivously a unique client, thus, total bag is 1
+                If Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                    iTotBags(iT) = 1
+                
+            ' if top pairs match, but bot pairs do not, it's the bottom of a  1 2 3 4 5 6 chain for sure ( as an example). Take the 6 as anchor
+                ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                    iTotBags(iT) = iBag(iT)  ' taking the 6 (just as an example) as the anchor
+                    iBtemp = iBag(iT) ' store this as an anchor, this COULD NOT BE A ZERO since we are in the <> 0 if statement
+                
+            ' if top pairs do NOT match, but bot pairs match, it's the top of a  1 2 3 4 5 6 chain for sure. Take the old anchor but reset counter
+                ElseIf Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                    
+                    If iBtemp = 0 Then 'if some how the sequence is   1 0 0 0 0 0 .. well the iBtemp is still set to zero. that is not cool, make if statement for this
+                        iTotBags(iT) = iBag(iT) 'this should always be a 1
+                    Else
+                        iTotBags(iT) = iBtemp  ' taking the anchor and then reset anchor
+                        iBtemp = 0
+                    End If
+                
+            ' if both top and bot pairs match, we are in the middle of that 123456 chain, climbing from bottom to top, but top and bot can be flanked by zeros too
+            ' for ex...   0 0 0 1 0 0 2 0  really messes things up
+            ' if we did not take anchor already, then chances are it's the largest number (the 2) for sure
+            ' else, we should just take the old anchor
+            
+                ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                
+                    If iBtemp = 0 Then 'if the anchor was not already taken
+                        iTotBags(iT) = iBag(iT)  ' taking the iBag value as the anchor
+                        iBtemp = iBag(iT) ' store this as an anchor
+                    Else
+                        iTotBags(iT) = iBtemp 'else, some anchor was already taken, this means the loop found the biggest value already.  Use that anchor
+                    End If 'Btemp <> 0 Then '
+                
+                Else 'this should not be possible
+                    MsgBox "The column A (CID) has been corrupted.  Please contact Peter"
+                    Exit Sub
+                End If ' of If Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Valu..........
+             
+            Else
+                iTotBags(iT) = 0
+            End If
+                
+                
+            
+Next 'iT end of loop that starts from bottom of the array and pops the Total Bag count
+
+' Cleared test pit @ 8:28 pm Feb 17
+For iB = 1 To NumStickers
+    Debug.Print ("Bag " + CStr(iBag(iB)) + " of " + CStr(iTotBags(iB)))
+Next
+
+' 3.3.3  Populate final Bag _ of _ string, compressed in 2019
+
+Dim sBagLabel() As String
+ReDim sBagLabel(1 To NumStickers) As String
+For i = 1 To NumStickers
+    sBagLabel(i) = "Bag" + CStr(iBag(i)) + "/" + CStr(iTotBags(i))
+Next
+
+' ---------------ADDRESSES TAB FEATURE --------------------- Feb 2016
+' 3.3.4 creat matrix to store addresses for joyeco to make a tab like this:
+'Column 1+1 - Name - G
+'Column 2+1 - Phone number - H
+'Column 3+1 - Address 1 - J
+'Column 4+1 - Address 2 - K
+'Column 5+1 - Intersection - L
+'Column 6+1- Notes 1 - F
+'Column 7+1- Notes 2 - M
+'Column 1 - Drop #
+
+Dim sAddresses() As String
+Dim AddressTotCols As Integer
+AddressTotCols = 12 'hard code this for the address tab feature
+ReDim sAddresses(1 To NumStickers, 1 To AddressTotCols) As String ' second dimensions is the number of columns in address tabs
+
+
+
+' ---------------DROP COUNTER FEATURE --------------------- Feb 2016
+' Feb 2016 New feature: DROP COUNTER
+' This feature is not so simple, because you can't simply take the total unique ID's and minus the number of ZeroOrders, this is because if one customer has MULTIPLE
+' zero orders in one day, that only counts as ONE less drop
+'Solution, make a two dimenion array, first col is Client ID, second column is the order count on Sun and Wed column:
+'101  6
+'101  5
+'102  6
+'102  6
+'103  6
+'103  0
+'103  0
+'in the above scneario, the total drop would be 3.  Therefore, make a function that FIRST, takes all unique values (3), then minus the zeros (which is 1, not 2)
+Dim DropNum As String ' used for the FIRST part of the drop # msg
+'Dim bugStop As String ' store array to view
+Dim cIDs() As Integer ' array to hold all CIDs and also the Sun or Wed bag count, unknown size
+ReDim cIDs(1 To NumStickers) As Integer 'size the array, does not account for blankstickers, remember to aacount for ZeroOrderHeadsUp
+Dim DropTotal As Integer
+Dim zeroCounterDrop As Integer
+zeroCounterDrop = 0
+Dim OrderCodeTemp, s, firstChar, lastChar As String
+
+Dim Lfiltered, Afiltered, Bfiltered, ExcludeFiltered As String
+
+'
+
+
+
+
+'**************************************************************************'
+'------------------- KEY SECTION --------------------------------- CORE CODE
+'------------------- ONE BY TEN MATRIX POPULATION ---------------- CORE CODE
+' this matrix makes a 1x10 array and puts important info on each stick on here, beginning with the order code to the address
+' the followup part of this code plots each 1x10 matrix into the right arrangement of boxes
+
+For yL = 1 To NumStickers 'yL is the row that this loop waterfalls down on, it is decitated by the same driver
+        
+        'get the client ID for vlookup purposes
+        clientID = ActiveCell.Offset(yL - 1, 0).Value
+          'get the actual ROW that the same client ID is in
+        clientIDrow = ActiveCell.Offset(yL - 1, 0).Row
+        
+        'If it's a sun sheet, check wed order numb
+        EmptyOrderCount = 1
+        If SunOrWed = "Sunday" Then
+            EmptyOrderCount = Cells(clientIDrow, colSun).Value
+        ElseIf SunOrWed = "Wednesday" Then
+            EmptyOrderCount = Cells(clientIDrow, colWed).Value
+        End If
+        
+        'BAG DROP TOTAL counter starts here.
+          'get the client ID for Drop counter 2D array and then the Sun/Wed bag count
+                
+        If EmptyOrderCount > 0 And EmptyOrderCount < 7 Then
+            cIDs(yL) = clientID 'now we have a populated cIDs array with ALL cIDs, next step is to count the uniq IDs, but don't count the unique ID's that have a ZeroOrder associated with it
+        ElseIf EmptyOrderCount < 0 And EmptyOrderCount > 6 Then
+                MsgBox "Someone ordered a number of bags that doesn't make sense, please check the Sunday or Wednesday totals"
+                Exit Sub
+        Else
+                cIDs(yL) = 0
+                zeroCounterDrop = zeroCounterDrop + 1
+        End If
+        
+        'find "count unique drops" for next step"
+            
+'SAMPLE OF a cID array
+'101  6  turns into     101
+'101  5                       101
+'102  6                     102
+'102  6                     102
+'103  6                     103
+'103  0                     0
+'103  0                     0
+              'bugStop = bugStop + " " + CStr(cIDs(yL)) 'passed bugstop 7:20pm
+              
+        
+        ' The 1 x 10 popping starts here:
+        
+        If EmptyOrderCount <> 0 Then ' make sure it's not a zero order
+            
+            'pop a 1 x 30 array from the clients tab, this saves me from vlookuping too much
+            For iClientCol = 1 To 30
+            'vlookup for a A2:AD1000 wide net -- this is a lot of data and it's a hard code - could make it efficient and faster by finding a way to limit the scan
+            
+                oneBy30(iClientCol) = CStr(Application.VLookup(clientID, Worksheets("CLIENTS").Range("A2:AD10000"), iClientCol))
+                'this pops the 1 by 30 array
+                'iClientCol <== this is to count the number of column to scan the CLIENTS tab, right now it's set to 30
+            Next
+            
+            
+
+
+            '(1) Order code goes here
+            'NEW in March 2019: Seperate the 1 row of order code into two
+
+            ' more about rng (range), this range captures all order codes from the row of cells which are framed by 2 hard-coded column names
+            'In an earlier sectuion, the code looked like this to create rng:
+            ' Set rng = Range(Cells(1, oStart("temp notes")), Cells(1, oEnd("TOTAL"))) ' for Order Fields - review this when adding columns -
+            'this should capture all the boxname row items ' CHANGE THIS IF ANDREI ADDS NEW MEAL - hard code
+            'this is rather Dynamic and usues Temp Notes and TOTAL to frame the range'
+
+
+
+
+            For Each cell In rng '--- loop through Range rng object
+                'if the meal column (A1, A2, etc) is not hidden and it's more than 0, then:
+                If cell.Columns.Hidden = False And Cells(clientIDrow, cell.Column).Value > 0 Then
+                
+                ' ---------- CLEAN UP ORDER CODE BEFORE PLOTTING INTO MATRIX HERE
+                ' b/c the un cleaned values look like this:
+                '.A1B    .A2B    .A3B    .A4B    .A5B    .A6B    .L7B    .L8 .L9B    .L10B   .L11B   .L12    .B4B    .B5B    .B6B    PR1 PR2 PR3 PR4
+                '
+                'how to get first char Dim s = "Character"
+                ' Dim firstChar = s(0)
+                'how to get last char: Right(1,string_name)
+                s = CStr(cell.Value)
+                firstChar = CStr(left(s, 1))
+                lastChar = CStr(right(s, 1))
+                
+                'only clip off end if it has A or B, because this states for Menu A or B
+                If lastChar = "A" Then
+                    OrderCodeTemp = left(s, Len(s) - 1) 'classic Left excel function
+                ElseIf lastChar = "B" Then
+                    OrderCodeTemp = left(s, Len(s) - 1) 'classic Left excel function
+                Else
+                    OrderCodeTemp = s
+                End If
+                
+                     ' TEST PIT MsgBox (firstChar & " " & lastChar)
+                    'if the meal quantity is 1 then there is no "x1" next to the order code, so we have two situations here below:
+                    
+                    
+                    If Cells(clientIDrow, cell.Column).Value = 1 Then
+                                           
+                    'put order code in a temp holder but NO x1's - June 2016
+                    ' how to clip off lat char of string if it's A or B: Left(myString, Len(myString) - 1)
+                    ' --------------------------------------------------------------------------------------
+                    '                              meal name                                                     umber of meals
+                                        
+                    oCodeTempStore = oCodeTempStore + OrderCodeTemp + "  " 'NO x1 if it's only 1 meal
+                    Else
+                    oCodeTempStore = oCodeTempStore + OrderCodeTemp + "x" + CStr(Cells(clientIDrow, cell.Column).Value) + "  "
+                    ' --------------------------------------------------------------------------------------
+                    End If
+                
+                End If ' of the order code
+            Next 'in rng for order code
+
+            'NEW March 2019 feature; oCodeTempStore has to be SORTED into 4 quadrants:
+            ' LIFESTYLE --  Bulk
+            ' ATHLETE -- BREAKFAST
+
+            'here are ALL POSSIBLE MEAL CODES as for 2019:
+            ' A1B A2B A3B A4B A5B A6B L1B L2B L3B L4B L5B L6B B1  B2  B3B .A1B    .A2B    .A3B    .A4B    .A5B    .A6B    .L7B    .L8 .L9B    .L10B   .L11B   .L12    .B4B    .B5B    .B6B
+            ' PR1 PR2 PR3 PR4 PR5 PR6 CA1 CA2 CA3 CA4 CA5 CA6 GR1 GR2 GR3 PR1 PR2 PR3 PR4 PR5 PR6 CA1 CA2 CA3 CA4 CA5 CA6 GR1 GR2 GR3'
+
+            'Overal, we need to filter and spilt each order snipit by the first letter (not . tho), into 4 categories
+            'then we need to put them into two rows: oCodeTempStore1stRow and oCodeTempStore2ndRow
+            'if there is only 1 category, remove the splitter --'
+
+            'ideal code:
+            'oCodeTempStore1stRow = filterfunction(oCodeTempStore,L) + "---" + filterfunction(oCodeTempStore,Any)
+            'oCodeTempStore2stRow = filterfunction(oCodeTempStore,A) + "---" + filterfunction(oCodeTempStore,B)
+
+            If Len(oCodeTempStore) > 1 Then
+            'start putting in filtered strings as per dimmed earlier: Dim Lfiltered, Afiltered, Bfiltered, ExcludeFiltered As String'
+
+            Lfiltered = OrderFilter(oCodeTempStore, "L")
+            Afiltered = OrderFilter(oCodeTempStore, "A")
+            Bfiltered = OrderFilter(oCodeTempStore, "B")
+            ExcludeFiltered = OrderExcludeFilter(oCodeTempStore, "L", "A", "B", "*")
+
+                ' FIRST ROW POPULATION, based on if the L or Any filters are present or not'
+
+                If Len(ExcludeFiltered) > 1 Then
+
+
+                    oCodeTempStore1stRow = Lfiltered + "  --  " + ExcludeFiltered
+                Else
+
+                    oCodeTempStore1stRow = Lfiltered + "        " + ExcludeFiltered
+
+                End If
+
+
+                ' 2ND ROW POPULATION, same logic'
+
+
+                If Len(Bfiltered) > 1 Then
+
+
+                    oCodeTempStore2ndRow = Afiltered + " -- " + Bfiltered
+
+                Else
+
+                    oCodeTempStore2ndRow = Afiltered + "        " + Bfiltered
+
+                End If
+
+
+
+            Else
+
+            oCodeTempStore1stRow = ""
+            oCodeTempStore2ndRow = ""
+
+            End If
+
+
+            '**********************************************************'
+            '* Putting values into 1x10 materix for the addres labels *'
+            '*********************************************************
+        
+
+            ' June 2016 put order code into where the WWW used to be:
+            oneByTen(1) = oCodeTempStore1stRow ' Adding CStr(EmptyOrderCount) would give the total number of meals in this bag
+            oCodeTempStore = " " 'reset tempstore after the yL loop
+            oCodeTempStore1stRow = " "
+
+            
+            oneByTen(2) = oCodeTempStore2ndRow
+            oCodeTempStore2ndRow = " "
+             
+            '(3.1) SPECIALS
+            If SunOrWed = "Sunday" Then 'grab the special column depending on sun or wed
+            iSpecialMealCol = colSunSPEC
+            Else
+            iSpecialMealCol = colWedSPEC
+            End If
+            
+            If Cells(clientIDrow, iSpecialMealCol).Value > 0 Then 'there really is a special
+                    sSpecial = "*" + CStr(Cells(clientIDrow, iSpecialMealCol).Value) + "xSPECIAL*"  'populate the special code
+            ElseIf IsNum(Cells(clientIDrow, iSpecialMealCol).Value) = False Then
+                    MsgBox ("Stoping the program because some strange text or blank was put in the SPECIAL field, row [ " + CStr(clientIDrow) + " ], please recheck values and remake labes :)")
+                    Exit Sub
+            Else
+            sSpecial = ""
+            End If
+
+            '(3.1.1) Bags with client feature - Aug 2016 - added new column in Clients tab, updated 2019 to remove this row and use it to store the Order Code as a 2nd row
+            
+            '(3.2) THREE VARIALBES in 1 CELL: SPECIALS + BAG _ OF _ + BAGS: , updated 2019 PP
+
+            oneByTen(3) = sSpecial + " " + sBagLabel(yL) + " BAGS:" + CStr(oneBy30(colBagsLastWeek)) ' add this number from the bags w client field in the CLIENTS tab, add it to the 2nd cell in the label
+        
+            '(4) Area code, evening/morning delivery, and COD USED TO GO here:
+            ' Now switch to just showing the Drop # and COD (Feb 2016)
+            
+            '  but first IS THERE A COD? if it's a normal one, add a $ sign
+            rngTemp = Cells(clientIDrow, colCOD).Address(RowAbsolute:=False, ColumnAbsolute:=False) ' store a Range for the paidCOD function
+            Set rngCOD = Range(rngTemp)
+            
+            If IsNum(Cells(clientIDrow, colCOD).Value) And Cells(clientIDrow, colCOD).Value > 0 And paidCOD(rngCOD) = False Then ' if it's a legit COD$ ,add a $
+                COD = " COD: $" + CStr(Cells(clientIDrow, colCOD).Value)
+            ElseIf IsNum(Cells(clientIDrow, colCOD).Value) And Cells(clientIDrow, colCOD).Value <= 0 Then ' if it's some weird 0 or something, don't add a $
+                COD = CStr(Cells(clientIDrow, colCOD).Value)
+            ElseIf IsEmpty(Cells(clientIDrow, colCOD).Value) Or paidCOD(rngCOD) = True Then 'if it's empty OR the client has already paid, don't do anything
+                COD = ""
+            Else 'Then it's some weird text or something, warn user, then continue if he selects YES
+                If MsgBox("There is a COD that does not have a regular number on row [ " + CStr(clientIDrow) + " ], it reads as [ " + CStr(Cells(clientIDrow, colCOD).Value) + " ].  Shall we continue anyways?", vbYesNo) = vbYes Then
+                    COD = CStr(Cells(clientIDrow, colCOD).Value)
+                Else
+                        MsgBox ("Stoping the program because some strange text or blank was put in COD, row [ " + CStr(clientIDrow) + " ], please recheck values and remake labes :)")
+                        Exit Sub
+                End If 'of the MsgBox stuff
+            End If 'of the COD statement
+        
+        '(4) continued    Drop Counter + COD
+        ' oneByTen(4) = oneBy30(colACode) + " " + oneBy30(colTimeofD) + " " + COD  'deleted Feb 2016
+        
+        DropNum = Cells(clientIDrow, colDrop).Value 'get drop dirctly from Drop column
+        
+        oneByTen(4) = " Drop " + CStr(DropNum) + " " + COD 'deleted Feb 2016 ADD DROP feature later
+        
+        '(5) allergies and notes 1
+        oneByTen(5) = " " + oneBy30(colAllergiesNotes1)
+        
+        '(6) to (10). data for  second column in a sticker. all from CLIENTS TAB
+        
+        oneByTen(6) = oneBy30(colFULLNAME) + "  " + oneBy30(colPhone) ' full name and number
+        oneByTen(7) = oneBy30(colAddressLine1) + " " + oneBy30(colUnit) ' address 1 and unit
+        oneByTen(8) = oneBy30(colCity) + " " + oneBy30(colPostal)
+        oneByTen(9) = oneBy30(colIntersection) ' intersection
+        oneByTen(10) = oneBy30(colAllergiesNotes2) ' allergies and notes 2
+                ' ---ADDRESS FEATURE
+'Column 1+1 - Name - G
+'Column 2+1 - Phone number - H
+'Column 3+1 - Address 1 - J
+'Column 4+1 - Address 2 - K
+'Column 5+1 - Intersection - L
+'Column 6+1- Notes 1 - F
+'Column 7+1- Notes 2 - M
+'Column 1 - Drop #
+'removed
+                
+            
+    Else 'it's a zero order
+    
+    ' there is some sort of IF statement that forces me to add longer strings to the array as oppose to tiny strings
+    
+        oneByTen(1) = "                             "
+        oneByTen(2) = "                             "
+        oneByTen(3) = "                             "
+        oneByTen(4) = "                             "
+        oneByTen(5) = "                             "
+        oneByTen(6) = "                             "
+        oneByTen(7) = "                             "
+        oneByTen(8) = "                             "
+        oneByTen(9) = "                             "
+        oneByTen(10) = "                             "
+        ZeroOrderHeadsUp = ZeroOrderHeadsUp + 1 'keep track of number of times a zero order was filled
+    
+    End If
+    
+' get out of the program if NO stickers are about to be make
+
+If ZeroOrderHeadsUp = NumStickers Then
+    MsgBox ("No orders were placed for ANY of the drivers you selected, please double check your Sunday's vs Wednesday's")
+    Exit Sub
+End If
+    
+' 3.2 pop 1x10 arrary into full left array before moving on to the next one
+
+        For xL = 1 To 10
+            L(xL, yL) = oneByTen(xL) 'the L() matrix
+        Next 'xL
+
+' return to anchor
+   Application.Goto "StartCell"
+ 
+Next 'yL
+
+
+
+
+'4. Add 4 spaces after every 2 in L()
+Dim yy, xx, y, sixCounter, NumStickersTimesThree As Integer ' counter keeps a 6-cycle count
+Dim LL() As String
+NumStickersTimesThree = NumStickers * 3
+ReDim LL(1 To 10, 1 To NumStickersTimesThree) As String
+xx = 1
+yy = 1
+y = 1
+sixCounter = 1
+
+
+For yy = 1 To NumStickersTimesThree ' Loop to pop LL()
+
+    ' THIS THING DOES STUFF I CANT EXPLAIN
+If sixCounter = 7 Then
+    sixCounter = 1
+End If  ' F U sixCounter!
+
+    Select Case sixCounter
+    Case 1 To 2 ' if it's the first 2 rows
+            xx = 1
+                For xx = 1 To 10 'fill all 10 columns in LL() with L() equivlant
+                    LL(xx, yy) = L(xx, y)
+                    ' LL(xx, yy) = "counter is 1 to 2. X:" + CStr(xx) + " Y:" + CStr(yy) 'L(xx, yy) ---- This was a debugger
+                Next xx
+            y = y + 1
+            sixCounter = sixCounter + 1
+            
+    Case 3 To 6  'if it's the 3rd to 6th row, make blanks
+            xx = 1
+            For xx = 1 To 10 'fill all 10 columns in LL() with BLANKS
+                LL(xx, yy) = ""
+                'LL(xx, y) = "counter is 3 to 6. X:" + CStr(xx) + " Y:" + CStr(y) 'suppose to be actual blank
+            Next xx
+            sixCounter = sixCounter + 1
+
+    End Select
+
+Next yy
+
+'------------- COUNT UNIQUE DROPS ------------------------------------------------------------
+Dim UniqueCIDDropCounter As Integer
+
+If zeroCounterDrop = 0 Then
+UniqueCIDDropCounter = UniqueItems(cIDs, True)
+Else
+UniqueCIDDropCounter = UniqueItems(cIDs, True) - 1
+End If
+
+
+
+
+'--------------------- PRINTING THE FINAL LABEL SHEET HERE via MATRIX LL() ----------------------------
+Dim x As Integer
+Dim firstColSticker As Boolean
+firstColSticker = True
+x = 1
+y = 1
+yy = 1
+For y = 1 To NumStickersTimesThree ' ====> y represent each row in the LL() array
+    If Len(LL(1, y)) > 1 And firstColSticker = True Then ' if the length of the first cell in the LL() array (www.onelife) is not blank, then
+        yy = 1
+        For yy = 1 To 5 'another loop to populate 1 sticker in the first col of stickers
+            '                        Cells(rows, columns)   LL(1-10, y)
+            Sheets(wsName).Cells(y + yy - 1, 1).Value = LL(yy, y) 'yy=1to5, y=each LL() row. Plot first column of 5 address info like WWW.ONELIFE to Allergies
+            Sheets(wsName).Cells(y + yy - 1, 2).Value = LL(yy + 5, y) 'bump yy to 6 to 11 to get addresses1 2 and etc
+            '   Cells().Vale need to make it move 5 rows down each time, but also remember that once it moves down 5 rows, it need to remember to
+            '  to not over lap
+            '  so.... if  y is lets say... 7, which is the 7th row in the LL() matrix.  Then y[7] + yy[1 loop top 5] - 1 = 6 + [1 to 5] = 7,8,9,10,11
+            '  when y=7, Cells(7,8,9,10,11   -  1,2) get populated by LL(yy,y) = LL(1 to 5, 7)
+            
+            firstColSticker = False
+        Next yy
+    
+   ElseIf Len(LL(1, y)) > 1 And firstColSticker = False Then ' SECOND column of stickers
+        yy = 1
+        For yy = 1 To 5
+            '                        Cells(rows, columns)   LL(1-10, y)
+            Sheets(wsName).Cells(y + yy - 2, 4).Value = LL(yy, y) 'yy=1to5, y=each LL() row. Plot first column of 5 address info like WWW.ONELIFE to Allergies
+            Sheets(wsName).Cells(y + yy - 2, 5).Value = LL(yy + 5, y)  'bump yy to 6 to 11
+            '  by the 2nd time, we need to bring cells() up ONE more additional because the 2nd row of L() info should be 1 row higher on the
+            '  second column of stickers
+            
+            firstColSticker = True
+        Next yy
+    Else
+    'Do nothing, but y will move down 1 more row
+    End If
+Next y
+
+'bug stop for drop feature
+'MsgBox bugStop
+
+'--- FINAL TOUCHES ----
+' auto fit columns here
+Worksheets(wsName).Columns("A:B").ShrinkToFit = True
+Worksheets(wsName).Columns("D:E").ShrinkToFit = True
+
+Worksheets(wsName).Columns("A:B").VerticalAlignment = xlTop
+Worksheets(wsName).Columns("D:E").VerticalAlignment = xlTop
+
+Worksheets(wsName).Columns("A:B").HorizontalAlignment = xlHAlignLeft
+Worksheets(wsName).Columns("D:E").HorizontalAlignment = xlHAlignLeft
+
+Worksheets(wsName).Columns("A").Font.Size = "11"
+Worksheets(wsName).Columns("B").Font.Size = "10.5"
+Worksheets(wsName).Columns("D").Font.Size = "11"
+Worksheets(wsName).Columns("E").Font.Size = "10.5"
+
+
+
+'---Mar 2019 , centre align only the order code cells'
+
+'Dim ws As Worksheet already earlier
+'Dim iC1, iC2 As Integer already earlier
+
+    'selects the first sheet in the active workbook to use as the parent object for all code contained in the WITH statement.  VBA is object oriented meaning there are a lot of parent-child relationships.  In this case, all the code inside the WITH statement is the parent, or containing object, and the internal code are the children objects
+'variable for current row number when looping through all the data
+Dim Ro As Integer
+'variable for the maximum number of rows in the dataset
+Dim mRo, iRo As Integer
+'variable for the maximum number of columns in the dataset
+Dim mCo, iCo As Integer
+
+           mRo = 1000 ' HARD CODE, ASSUME MAX OF 2000 rows'
+            mCo = 5 ' will always be 5 columns max'
+
+
+
+For iCo = 1 To mCo Step 3 'colmn loop, on Column 1 or 4
+    For iRo = 1 To mRo Step 6 'horiztonal loop
+
+            
+            'Worksheets(wsName).Cells(iRo, iCo).HorizontalAlignment = xlHAlignCenter
+            'Worksheets(wsName).Cells(iRo + 1, iCo).HorizontalAlignment = xlHAlignCenter
+
+
+            Worksheets(wsName).Cells(iRo, iCo).Font.FontStyle = "Bold"
+            Worksheets(wsName).Cells(iRo + 1, iCo).Font.FontStyle = "Bold"
+
+    Next iRo
+Next iCo
+
+
+
+
+
+
+
+
+
+
+
+'conditional formatting
+Sheets(wsName).Select  ' column select for the new work sheet
+Columns("A:E").Select
+'highlight anything that begins with a * --- hard code text string for the SPECIALS meals cell
+
+    Selection.FormatConditions.Add Type:=xlTextString, String:="*", _
+        TextOperator:=xlBeginsWith
+    Selection.FormatConditions(Selection.FormatConditions.Count).SetFirstPriority
+    With Selection.FormatConditions(1).Interior
+        .Pattern = xlSolid
+        '.PatternColorIndex = 1 'RGB(0, 0, 0) 'xlAutomatic ' BLACK IN RGB 0-0-0
+        .ColorIndex = 1 ' xlAutomatic  'yellow = 6, black =1
+    End With
+    Selection.FormatConditions(1).Font.ColorIndex = 2 'white = 2
+    Selection.FormatConditions(1).StopIfTrue = False
+    
+
+'--------------------- PRINTING ADDRESSES TAB -----------------------------------------------------------
+'rrmoved
+
+
+' ---------------------------------- FINAL FINISHED MESSAGE ----------------------------------
+Dim GeneratingLabelsMsg As String
+    GeneratingLabelsMsg = CStr(NumStickers) + " labels. " + CStr(UniqueCIDDropCounter) + " Drops. " + "See [  " + wsName + "  ] tab. "
+
+If ZeroOrderHeadsUp > 0 Then
+    GeneratingLabelsMsg = GeneratingLabelsMsg + CStr(ZeroOrderHeadsUp) + " clients got zero orders for this round"
+End If
+
+'MsgBox GeneratingLabelsMsg REMOVED AS PER ANDREI REQUEST NOV 2016
+
+'final tab setup touchups - Jan 12
+Dim Header As String
+Header = CStr(tDriver) + " | " + CStr(SunOrWed) + " | " + CStr(NumStickers - ZeroOrderHeadsUp) + " labels | " + CStr(UniqueCIDDropCounter) + " total drops"
+
+With ws.PageSetup
+    .LeftHeader = Header 'adding left header, include ZeroOrderHeadsUp count
+End With
+
+
+'final variable resets
+
+'PArt of address tab feature
+''Dim AdrTabName As String
+''AdrTabName = CStr(wsName2)
+''Worksheets(AdrTabName).Columns.AutoFit
+
+wsName = "" 'not even sure if this worked
+wsName2 = ""
+
+
+
+
+End Sub
+
+
+
+Sub InsertAndCopy() 'add row feature / new row feature
+ ' insert a row and copies from above
+' Dim RowVal, RowVal2 As String
+  
+' GO BACK TO THIS LATER
+  Rows(Selection.Row - 1).Copy
+'Range("C" & (Selection.Row)).Value = RowVal2
+'MsgBox (RowVal & RowVal2)
+Rows(Selection.Row).Insert Shift:=xlDown
+
+End Sub
+
+
+Sub a()
+'
+' A meals Macro
+'
+
+'
+    Sheets("MealNames").Select
+    Range("A26:AD26").Select 'HARD CODE - select the meal names from the tab "meal ames"
+    Selection.Copy
+    Sheets("ORDERS").Select
+    Range("T1:AW1").Select 'HARD CODE - paste here
+    Selection.PasteSpecial Paste:=xlValues, Operation:=xlNone, SkipBlanks:= _
+        False, Transpose:=False
+End Sub
+
+
+Sub B()
+'
+' B meals Macro
+'
+
+'
+    Sheets("MealNames").Select
+    Range("A34:AD34").Select 'HARD CODE - select the meal names from the tab "meal ames"
+    Selection.Copy
+    Sheets("ORDERS").Select
+    Range("T1:AW1").Select 'HARD CODE - paste here
+    Selection.PasteSpecial Paste:=xlValues, Operation:=xlNone, SkipBlanks:= _
+        False, Transpose:=False
+End Sub
+
+
+Function ConvertToLetter(iCol As Integer) As String 'part of bugscanner
+   Dim iAlpha As Integer
+   Dim iRemainder As Integer
+   iAlpha = Int(iCol / 27)
+   iRemainder = iCol - (iAlpha * 26)
+   If iAlpha > 0 Then
+      ConvertToLetter = Chr(iAlpha + 64)
+   End If
+   If iRemainder > 0 Then
+      ConvertToLetter = ConvertToLetter & Chr(iRemainder + 64)
+   End If
+End Function
+
+Function GetLastClientRow() As Integer 'get the row # that the last client ID was inputted
+Dim r As Integer 'part of bugscanner
+r = 1
+
+Do While Cells(r, 1).Value > 0
+r = r + 1
+Loop
+
+'got last row
+GetLastClientRow = r - 1 'to counter additional count
+
+
+End Function
+
+Sub BugScanner()
+'moved to main code
+End Sub
+
+
+
+Sub BagCount()
+
+Dim YesOrNoAnswerToMessageBox As String
+Dim QuestionToMessageBox As String
+
+    QuestionToMessageBox = "Are you ready to clear column C (Bags Left) and begin a new bag counter? (Note: when clients take up more than 2 rows in the order tab, the program will only use the client's first row to count the bags)"
+
+    YesOrNoAnswerToMessageBox = MsgBox(QuestionToMessageBox, vbYesNo, "Bag Count")
+
+    If YesOrNoAnswerToMessageBox = vbNo Then
+        'do nothing
+         MsgBox "Nevermind, nothing was done"
+       
+    Else
+              Application.Calculation = xlCalculationManual
+Application.EnableEvents = False
+
+Dim rng1, rng2 As Integer
+Dim i As Integer
+
+rng1 = Sheets("CLIENTS").Range("A" & Rows.Count).End(xlUp).Row + 20 'count how many clients there are, add 20 to adjust for deleted clients
+rng2 = Sheets("ORDERS").Range("A" & Rows.Count).End(xlUp).Row + 20 'count how many clients there are in ORDERS TAB, add 20 to adjust for deleted clients
+
+For i = 2 To rng1
+         Sheets("CLIENTS").Range("P" & i).Value = Sheets("CLIENTS").Range("R" & i).Value 'hard code letters in range
+Next i
+
+For i = 2 To rng2
+         Sheets("ORDERS").Range("C" & i).Value = "" 'hard code zeros to clear
+Next i
+
+
+
+
+Application.Calculation = xlCalculationAutomatic
+Application.EnableEvents = True
+    
+    
+        MsgBox "Bags Counted! Bags Left (column C) has been added to Bags Total (column B)"
+         
+
+    End If
+    
+End Sub
+
+
+Sub AddressMaker()
+'
+' --- COPY OF the LABEL BUTTON to make a seperate address tab button ---------------------------------------------
+'
+       ActiveCell.Select 'select the activated cell
+       
+' 0 Batch get column numbers from Clients tab
+
+Dim colDrop, colTimeofD, colAllergiesNotes1, colFULLNAME, colPhone, colTag, colAddressLine1, colIntersection, colAllergiesNotes2, colSun, colWed As Integer
+Dim colWedSPEC, colSunSPEC, colCOD, colDriver As Integer
+Dim colPostal, colUnit, colCity As Integer
+
+colDrop = colBasedOnTitle("ORDERS", "Drop") 'updated Feb 2016
+colTimeofD = colBasedOnTitle("CLIENTS", "Time of D")
+colAllergiesNotes1 = colBasedOnTitle("CLIENTS", "Allergies, Notes 1")
+colFULLNAME = colBasedOnTitle("CLIENTS", "Full Name")
+colPhone = colBasedOnTitle("CLIENTS", "Phone")
+colDriver = colBasedOnTitle("ORDERS", " Driver")
+'colSub = colBasedOnTitle("CLIENTS", "Sub")
+colAddressLine1 = colBasedOnTitle("CLIENTS", "STREET NUMBER AND NAME")
+colUnit = colBasedOnTitle("CLIENTS", "Unit")
+colPostal = colBasedOnTitle("CLIENTS", "POSTAL CODE")
+colCity = colBasedOnTitle("CLIENTS", "CITY")
+colIntersection = colBasedOnTitle("CLIENTS", "Intersection")
+colAllergiesNotes2 = colBasedOnTitle("CLIENTS", "Allergies, Notes 2")
+
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+colSun = colBasedOnTitle("ORDERS", "sun")
+colWed = colBasedOnTitle("ORDERS", "wed")
+colSunSPEC = colBasedOnTitle("ORDERS", "sSPEC")
+colWedSPEC = colBasedOnTitle("ORDERS", "wSPEC")
+colCOD = colBasedOnTitle("ORDERS", "COD")
+
+Dim colBagsLastWeek, colBagsThisWeek As Integer
+colBagsLastWeek = colBasedOnTitle("CLIENTS", "Bags Tot Last Week")
+colBagsThisWeek = colBasedOnTitle("CLIENTS", "Bags Tot This Week")
+
+'1. Check if right cell is selected  ---- General pre-start error check -- else exit sub
+If ActiveCell.Column <> 1 Then
+    MsgBox "Please make sure you have a Client ID (first column) selected to start"
+    Exit Sub
+End If
+' Check if someone did not select the top row
+If ActiveCell.Offset(-1, colDriver - 1).Value = ActiveCell.Offset(0, colDriver - 1).Value Then
+                If MsgBox("WARNING: it looks like you didn't select the first row of the drivers list, continue?", vbYesNo) = vbNo Then
+                    Exit Sub
+                End If
+End If
+
+If ActiveCell.Row < 3 Then
+    MsgBox "Please do not make labels for the first and second row, that doesn't make sense :)"
+    Exit Sub
+End If
+
+If ActiveCell.Worksheet.Name <> "ORDERS" Then
+    MsgBox "Please make sure you are in the ORDERS tab.  Remember to select the top Client ID cell and the program will 'waterfall' down until the driver changes"
+    Exit Sub
+End If
+
+If Application.WorksheetFunction.VLookup(ActiveCell, Worksheets("CLIENTS").Range("A:A"), 1) <> ActiveCell Then
+    MsgBox "This Client ID is not on your CLIENTS database."
+    Exit Sub
+End If
+
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+'Check if user added a column
+'If Range("AU:1") <> "TOTAL" Then ' HARD CODE change when changing columns
+ '   MsgBox "WARNING - It looks like you've added or deleted a column, please revert back to a previous version or contact Akitasoft"
+  '  Exit Sub
+'End If
+
+'Check if it's a Wednesday, sunday, or all sheet
+' Grab the colum numbers of A1A and A1B
+Dim tempNotesCol, i, sC1col, wC1col As Integer
+tempNotesCol = colBasedOnTitle("ORDERS", "temp notes") 'hard code for temp notes header
+sC1col = tempNotesCol + 1 'if one column to the right of "temp notes" is not hidden, then it must be sunday bc it's right beside it
+wC1col = tempNotesCol + 17 'otherwise, check the first column that is a wednesday column
+'later, this code will check if it's hidden or not to determine SUN vs WED
+
+'Check for sunday or wed
+' DO NOT REMOVE THIS CODE
+Dim SunOrWed As String
+If Columns(sC1col).EntireColumn.Hidden = False And Columns(wC1col).EntireColumn.Hidden = False Then 'HARD CODE both wed and sun sheets are open
+    MsgBox "Please convert to either a Sunday or Wednesday sheet before making address tab"
+    Exit Sub
+ElseIf Columns(sC1col).EntireColumn.Hidden = False And Columns(wC1col).EntireColumn.Hidden = True Then ' it's a sunday sheet
+    SunOrWed = "Sunday"
+ElseIf Columns(sC1col).EntireColumn.Hidden = True And Columns(wC1col).EntireColumn.Hidden = False Then
+    SunOrWed = "Wednesday"
+Else
+    MsgBox "Something is not right; it looks like the columns have been shifted all out of place. Please double check your labels"
+End If
+
+
+
+'1.1 Checking number of stickers
+Dim NumStickers As Integer
+NumStickers = CheckNumStickers(ActiveCell.Address)
+
+'1.2 Anchor the original activecell
+Range(ActiveCell.Address).Name = "StartCell"  ' Gives for example ORDERS!$A$2, I DONT KNOW HOW THIS LINE WORKS
+
+'1.3 full recalc
+
+Application.CalculateFullRebuild
+
+
+'2. make new worksheet, name it after driver - NO NEED FOR ADDRESS MAKER TAB
+Dim ws As Worksheet
+Dim wsName As String
+Dim tDriver As String
+' handling multiple tabs
+Dim wsSuffix As Integer
+wsSuffix = 0
+' taking the driver as tab name
+tDriver = ActiveCell.Offset(0, colDriver - 1).Value 'grab driver name
+wsName = tDriver
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+
+'2.2 make a SECOND worksheet, name it after driver2 for addresses / route mapping - ADDRESS TAB
+' KEEP THIS IN ADDRES TAB FUNCTION:
+Dim ws2 As Worksheet
+Dim wsName2 As String
+wsName2 = wsName + " ADRS"
+
+'if tab name already taken, this loops until it gets a new tab name
+    Do
+        If CheckWsNameDup(wsName2) Then
+            wsSuffix = wsSuffix + 1
+                If wsSuffix >= 2 Then 'delete suffix from last time if it's pass 2nd tab
+                    wsName2 = left(wsName2, Len(wsName) - 1)
+                End If
+            
+            'adding the name with a suffix
+            wsName2 = wsName2 + CStr(wsSuffix)
+                        
+        End If
+    Loop Until CheckWsNameDup(wsName2) = False
+
+    If wsSuffix = 100 Then
+            MsgBox "Got 99 tabs but a bitch aint one, if you having to many tabs plz delete some son"
+    End If
+
+
+' SETUPD THE ADDRESS TAB SHEET HEIGHTS
+Set ws2 = ThisWorkbook.Sheets.Add()
+ws2.Name = wsName2
+ws2.Rows.RowHeight = 13.21
+ws2.Tab.color = 2 ' whatever color
+'Page setup stuff  ------------- TAB SETUP FOR ROUTE MAP TAB-------------------------
+With ws2.PageSetup
+    .Orientation = xlPortrait
+    .Zoom = 90
+    .PrintGridlines = False
+End With
+
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+'go back to startcell
+Application.Goto "StartCell"
+
+' 3. Make left array
+Dim L() As String
+ReDim L(1 To 10, 1 To NumStickers * 3) As String
+
+' 3.1 Make 1 x 10 array called "oneBy30"
+
+Dim oneByTen(1 To 10), oneBy30(1 To 30) As String
+Dim oCodeTempStore As String ' FYI : ADDRESS MAKER FEATURE **********************'
+Dim rng, cell, rngCOD As Range ' create loop to read each column, make a rng object and set it
+Dim rngTemp As String ' not sure but try it
+
+' **************************************************
+' IMPORTANT RNG : this captures the order field
+' **************************************************
+Set rng = Range(Cells(1, oStart("temp notes")), Cells(1, oEnd("TOTAL"))) ' for Order Fields - review this when adding columns -
+'this should capture all the boxname row items ' CHANGE THIS IF ANDREI ADDS NEW MEAL - hard code
+'this is rather Dynamic and usues Temp Notes and TOTAL to frame the range
+
+Dim COD As String
+Dim iSpecialMealCol As Integer
+Dim sSpecial As String
+Dim EmptyOrderCount, ZeroOrderHeadsUp As Integer
+Dim clientID, clientIDrow As Integer
+Dim xL, yL, iClientCol As Integer
+
+
+' 3.3  -  Bag _ of _ feature   Feb 16 2015
+
+
+' 3.3.1 Create and pop and array with the iBag value, by looping from top to bottom.  Since it's based on cell values, it does NOT need a buffer
+Dim iB As Integer
+Dim iBag() As Integer
+ReDim iBag(1 To NumStickers) As Integer
+
+Dim iBtemp As Integer
+iBtemp = 0
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+For iB = 1 To NumStickers 'iB is the row that this loop waterfalls down on, it is dictated by the same driver
+        
+        'get the actual ROW that the same client ID is in
+        clientIDrow = ActiveCell.Offset(iB - 1, 0).Row
+        
+        EmptyOrderCount = 1
+        If SunOrWed = "Sunday" Then
+            EmptyOrderCount = Cells(clientIDrow, colSun).Value 'take how many meals ordered on Sun
+        ElseIf SunOrWed = "Wednesday" Then
+            EmptyOrderCount = Cells(clientIDrow, colWed).Value 'take how many meals ordered on Wed
+        End If
+    
+        'Make sure we are doing non zeros
+        If EmptyOrderCount <> 0 Then
+            ' if top AND bot pairs do not match eachother, then it's obivously a unique client, thus, bag 1
+            If Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                iBag(iB) = 1
+            ' if top pairs match, but bot pairs do not, it's the bottom of a  1 2 3 4 5 6 chain ( as an example).
+            ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                iBtemp = iBtemp + 1
+                iBag(iB) = iBtemp  ' so if the previous iB had a value of  2, then now this row has 3
+                iBtemp = 0 'it's at the end of the temp counter, reset counter
+                
+             ' if top pairs do NOT match, but bot pairs match, it's the top of a  1 2 3 4 5 6 chain.  Start the counter at 1
+            ElseIf Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                iBtemp = 1
+                iBag(iB) = iBtemp
+        
+             ' if both top and bot pairs match, we are in the middle of that 123456 chain, climbing from top to bottom
+            ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                iBtemp = iBtemp + 1
+                iBag(iB) = iBtemp
+            End If
+            
+        Else
+            iBag(iB) = 0 'if the first row is a 0 order then it's a 0
+        End If 'end of the statement that populates the iBag array
+
+Next iB ' iB  ... end of loop that figures out the Bag Numbers
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+iBtemp = 0
+' Array iBag(1 to NumStickers) is now populated!
+
+'  3.3.2 Time to pop iBagT() ; the total number of bags for this client
+Dim iT As Integer
+Dim iTotBags() As Integer
+ReDim iTotBags(1 To NumStickers) As Integer ' same size as iBag()
+
+For iT = NumStickers To 1 Step -1 ' Reverse loop aww yea.  Climbing from bottom to top to catch the largest number in a 12345 bag sequence
+
+        'get the actual ROW that the same client ID is in
+        clientIDrow = ActiveCell.Offset(iT - 1, 0).Row
+            
+            If iBag(iT) <> 0 Then
+
+            ' if top and bot pairs DO NOT match eachother, then it's obivously a unique client, thus, total bag is 1
+                If Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                    iTotBags(iT) = 1
+                
+            ' if top pairs match, but bot pairs do not, it's the bottom of a  1 2 3 4 5 6 chain for sure ( as an example). Take the 6 as anchor
+                ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value <> Cells(clientIDrow + 1, 1).Value Then
+                    iTotBags(iT) = iBag(iT)  ' taking the 6 (just as an example) as the anchor
+                    iBtemp = iBag(iT) ' store this as an anchor, this COULD NOT BE A ZERO since we are in the <> 0 if statement
+                
+            ' if top pairs do NOT match, but bot pairs match, it's the top of a  1 2 3 4 5 6 chain for sure. Take the old anchor but reset counter
+                ElseIf Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                    
+                    If iBtemp = 0 Then 'if some how the sequence is   1 0 0 0 0 0 .. well the iBtemp is still set to zero. that is not cool, make if statement for this
+                        iTotBags(iT) = iBag(iT) 'this should always be a 1
+                    Else
+                        iTotBags(iT) = iBtemp  ' taking the anchor and then reset anchor
+                        iBtemp = 0
+                    End If
+                
+            ' if both top and bot pairs match, we are in the middle of that 123456 chain, climbing from bottom to top, but top and bot can be flanked by zeros too
+            ' for ex...   0 0 0 1 0 0 2 0  really messes things up
+            ' if we did not take anchor already, then chances are it's the largest number (the 2) for sure
+            ' else, we should just take the old anchor
+            
+                ElseIf Cells(clientIDrow, 1).Value = Cells(clientIDrow - 1, 1).Value And Cells(clientIDrow, 1).Value = Cells(clientIDrow + 1, 1).Value Then
+                
+                    If iBtemp = 0 Then 'if the anchor was not already taken
+                        iTotBags(iT) = iBag(iT)  ' taking the iBag value as the anchor
+                        iBtemp = iBag(iT) ' store this as an anchor
+                    Else
+                        iTotBags(iT) = iBtemp 'else, some anchor was already taken, this means the loop found the biggest value already.  Use that anchor
+                    End If 'Btemp <> 0 Then '
+                
+                Else 'this should not be possible
+                    MsgBox "The column A (CID) has been corrupted.  Please contact Akitasoft"
+                    Exit Sub
+                End If ' of If Cells(clientIDrow, 1).Value <> Cells(clientIDrow - 1, 1).Valu..........
+             
+            Else
+                iTotBags(iT) = 0
+            End If
+            
+Next 'iT end of loop that starts from bottom of the array and pops the Total Bag count
+
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+' 3.3.3  Populate final Bag _ of _ string
+
+Dim sBagLabel() As String
+ReDim sBagLabel(1 To NumStickers) As String
+For i = 1 To NumStickers
+    sBagLabel(i) = "Bag" + CStr(iBag(i)) + "/" + CStr(iTotBags(i))
+Next
+
+Dim sAddresses() As String
+Dim AddressTotCols As Integer
+AddressTotCols = 12 'hard code this for the address tab feature
+ReDim sAddresses(1 To NumStickers, 1 To AddressTotCols) As String ' second dimensions is the number of columns in address tabs
+
+
+' ---------------DROP COUNTER FEATURE --------------------- Feb 2016
+'in the above scneario, the total drop would be 3.  Therefore, make a function that FIRST, takes all unique values (3), then minus the zeros (which is 1, not 2)
+Dim DropNum As String ' used for the FIRST part of the drop # msg
+'Dim bugStop As String ' store array to view
+Dim cIDs() As Integer ' array to hold all CIDs and also the Sun or Wed bag count, unknown size
+ReDim cIDs(1 To NumStickers) As Integer 'size the array, does not account for blankstickers, remember to aacount for ZeroOrderHeadsUp
+Dim DropTotal As Integer
+Dim zeroCounterDrop As Integer
+zeroCounterDrop = 0
+Dim OrderCodeTemp, s, firstChar, lastChar As String
+
+'------------------- KEY SECTION --------------------------------- CORE CODE
+'------------------- ONE BY TEN MATRIX POPULATION ---------------- CORE CODE
+' this matrix makes a 1x10 array and puts important info on each stick on here, beginning with the order code to the address
+' the followup part of this code plots each 1x10 matrix into the right arrangement of boxes
+
+For yL = 1 To NumStickers 'yL is the row that this loop waterfalls down on, it is decitated by the same driver
+        '                                                                           FYI : ADDRESS MAKER FEATURE **********************
+        'get the client ID for vlookup purposes
+        clientID = ActiveCell.Offset(yL - 1, 0).Value
+          'get the actual ROW that the same client ID is in
+        clientIDrow = ActiveCell.Offset(yL - 1, 0).Row
+        
+        'If it's a sun sheet, check wed order numb
+        EmptyOrderCount = 1
+        If SunOrWed = "Sunday" Then
+            EmptyOrderCount = Cells(clientIDrow, colSun).Value
+        ElseIf SunOrWed = "Wednesday" Then
+            EmptyOrderCount = Cells(clientIDrow, colWed).Value
+        End If
+        
+        'BAG DROP TOTAL counter starts here.
+          'get the client ID for Drop counter 2D array and then the Sun/Wed bag count
+                
+        If EmptyOrderCount > 0 And EmptyOrderCount < 7 Then
+            cIDs(yL) = clientID 'now we have a populated cIDs array with ALL cIDs, next step is to count the uniq IDs, but don't count the unique ID's that have a ZeroOrder associated with it
+        ElseIf EmptyOrderCount < 0 And EmptyOrderCount > 6 Then
+                MsgBox "Someone ordered a number of bags that doesn't make sense, please check the Sunday or Wednesday totals"
+                Exit Sub
+        Else
+                cIDs(yL) = 0
+                zeroCounterDrop = zeroCounterDrop + 1
+        End If
+        
+        'find "count unique drops" for next step"
+        
+        ' The 1 x 10 popping starts here:
+        '                                                                           FYI : ADDRESS MAKER FEATURE **********************
+        If EmptyOrderCount <> 0 Then ' make sure it's not a zero order
+            
+            'pop a 1 x 30 array from the clients tab, this saves me from vlookuping too much
+            For iClientCol = 1 To 30
+            'vlookup for a A2:AD1000 wide net -- this is a lot of data and it's a hard code - could make it efficient and faster by finding a way to limit the scan
+            
+                oneBy30(iClientCol) = CStr(Application.VLookup(clientID, Worksheets("CLIENTS").Range("A2:AD10000"), iClientCol))
+                'this pops the 1 by 30 array
+                'iClientCol <== this is to count the number of column to scan the CLIENTS tab, right now it's set to 30
+            Next
+            
+            
+            ' (1) data for first column is now the order code - June 2016 change
+            'oneByTen(1) = "WWW.ONELIFEMEALS.COM" - old
+            
+
+            '(2) Order code goes here
+            For Each cell In rng '--- loop through rng object
+                'if the meal column (A1, A2, etc) is not hidden and it's more than 0, then:
+                If cell.Columns.Hidden = False And Cells(clientIDrow, cell.Column).Value > 0 Then
+                
+                ' ---------- CLEAN UP ORDER CODE BEFORE PLOTTING INTO MATRIX HERE
+                'how to get first char Dim s = "RAJAN"
+                ' Dim firstChar = s(0)
+                'how to get last char: Right(1,string_name)
+                s = CStr(cell.Value)
+                firstChar = CStr(left(s, 1))
+                lastChar = CStr(right(s, 1))
+                
+                'only clip off end if it has A or B
+                If lastChar = "A" Then
+                    OrderCodeTemp = left(s, Len(s) - 1)
+                ElseIf lastChar = "B" Then
+                    OrderCodeTemp = left(s, Len(s) - 1)
+                Else
+                    OrderCodeTemp = s
+                End If
+                
+                     ' TEST PIT MsgBox (firstChar & " " & lastChar)
+                    'if the meal quantity is 1
+                    
+                    
+                    If Cells(clientIDrow, cell.Column).Value = 1 Then
+                                           
+                    'put order code in a temp holder but NO x1's - June 2016
+                    ' how to clip off lat char of string if it's A or B: Left(myString, Len(myString) - 1)
+                    ' --------------------------------------------------------------------------------------
+                    '                              meal name                                                     umber of meals
+                                        
+                    oCodeTempStore = oCodeTempStore + OrderCodeTemp + "  " 'NO x1 if it's only 1 meal
+                    Else
+                    oCodeTempStore = oCodeTempStore + OrderCodeTemp + "x" + CStr(Cells(clientIDrow, cell.Column).Value) + "  "
+                    ' --------------------------------------------------------------------------------------
+                    End If
+                
+                End If ' of the order code
+            Next 'in rng for order code
+        
+            'put temp order code into matrix
+            ' June 2016 put order code into where the WWW used to be:
+            oneByTen(1) = oCodeTempStore ' Adding CStr(EmptyOrderCount) would give the total number of meals in this bag
+            oCodeTempStore = "" 'reset tempstore after the yL loop
+             
+            '(3.1) SPECIALS
+            If SunOrWed = "Sunday" Then 'grab the special column depending on sun or wed
+                iSpecialMealCol = colSunSPEC
+            Else
+                iSpecialMealCol = colWedSPEC
+            End If
+            
+            If Cells(clientIDrow, iSpecialMealCol).Value > 0 Then 'there really is a special
+                    sSpecial = "*" + CStr(Cells(clientIDrow, iSpecialMealCol).Value) + "xSPECIAL*"  'populate the special code
+                ElseIf IsNum(Cells(clientIDrow, iSpecialMealCol).Value) = False Then
+                    MsgBox ("Stoping the program because some strange text or blank was put in the SPECIAL field, row [ " + CStr(clientIDrow) + " ], please recheck values and remake labes :)")
+                    Exit Sub
+                Else
+                    sSpecial = ""
+            End If
+            
+            '(3.1.1) Bags with client feature - Aug 2016 - added new column in Clients tab, updated 2019
+            
+            oneByTen(2) = " BAGS:" + CStr(oneBy30(colBagsLastWeek)) ' add this number from the bags w client field in the CLIENTS tab, add it to the 2nd cell in the label
+            
+            
+            '(3.2) SPECIALS + BAG _ OF _ here + BAGS: here (Feb 2019 PP change):
+
+            oneByTen(3) = sSpecial + " " + sBagLabel(yL)
+        
+            '(4) Area code, evening/morning delivery, and COD USED TO GO here:
+            ' Now switch to just showing the Drop # and COD (Feb 2016)
+            
+            '  but first IS THERE A COD? if it's a normal one, add a $ sign
+            rngTemp = Cells(clientIDrow, colCOD).Address(RowAbsolute:=False, ColumnAbsolute:=False) ' store a Range for the paidCOD function
+            Set rngCOD = Range(rngTemp)
+            
+            If IsNum(Cells(clientIDrow, colCOD).Value) And Cells(clientIDrow, colCOD).Value > 0 And paidCOD(rngCOD) = False Then ' if it's a legit COD$ ,add a $
+                COD = " COD: $" + CStr(Cells(clientIDrow, colCOD).Value)
+            ElseIf IsNum(Cells(clientIDrow, colCOD).Value) And Cells(clientIDrow, colCOD).Value <= 0 Then ' if it's some weird 0 or something, don't add a $
+                COD = CStr(Cells(clientIDrow, colCOD).Value)
+            ElseIf IsEmpty(Cells(clientIDrow, colCOD).Value) Or paidCOD(rngCOD) = True Then 'if it's empty OR the client has already paid, don't do anything
+                COD = ""
+            Else 'Then it's some weird text or something, warn user, then continue if he selects YES
+                If MsgBox("There is a COD that does not have a regular number on row [ " + CStr(clientIDrow) + " ], it reads as [ " + CStr(Cells(clientIDrow, colCOD).Value) + " ].  Shall we continue anyways?", vbYesNo) = vbYes Then
+                    COD = CStr(Cells(clientIDrow, colCOD).Value)
+                Else
+                        MsgBox ("Stoping the program because some strange text or blank was put in COD, row [ " + CStr(clientIDrow) + " ], please recheck values and remake labes :)")
+                        Exit Sub
+                End If 'of the MsgBox stuff
+            End If 'of the COD statement
+        
+        '(4) continued    Drop Counter + COD
+        ' oneByTen(4) = oneBy30(colACode) + " " + oneBy30(colTimeofD) + " " + COD  'deleted Feb 2016
+        
+        DropNum = Cells(clientIDrow, colDrop).Value 'get drop directly from Drop column
+        
+        oneByTen(4) = " Drop " + CStr(DropNum) + " " + COD 'deleted Feb 2016 ADD DROP feature later
+        
+        '(5) allergies and notes 1
+        oneByTen(5) = " " + oneBy30(colAllergiesNotes1)
+        
+        '(6) to (10). data for  second column in a sticker. all from CLIENTS TAB
+        
+        oneByTen(6) = oneBy30(colFULLNAME) + "  " + oneBy30(colPhone) ' full name and number
+        oneByTen(7) = oneBy30(colAddressLine1) + " " + oneBy30(colUnit) ' address 1 and unit
+        oneByTen(8) = oneBy30(colCity) + " " + oneBy30(colPostal)
+        oneByTen(9) = oneBy30(colIntersection) ' intersection
+        oneByTen(10) = oneBy30(colAllergiesNotes2) ' allergies and notes 2
+                ' ---ADDRESS FEATURE
+
+                'POPULATE ADDRESS ARRAY hard code
+                sAddresses(yL, 1) = oneByTen(4) 'drop # and COD
+                sAddresses(yL, 2) = oneByTen(3) 'bag # of # and specials
+                sAddresses(yL, 3) = oneBy30(colFULLNAME)
+                sAddresses(yL, 4) = "               " 'BLANK
+                sAddresses(yL, 5) = oneBy30(colAddressLine1)
+                sAddresses(yL, 6) = oneBy30(colCity)
+                sAddresses(yL, 7) = oneBy30(colPostal)
+                sAddresses(yL, 8) = oneBy30(colUnit)
+                'sAddresses(yL, 9) = "                 " 'BLANK
+                sAddresses(yL, 9) = oneBy30(colIntersection)
+                sAddresses(yL, 10) = oneBy30(colAllergiesNotes1)
+                sAddresses(yL, 11) = oneBy30(colAllergiesNotes2)
+                
+   '                                                                           FYI : ADDRESS MAKER FEATURE **********************
+    Else 'it's a zero order
+    
+    ' there is some sort of IF statement that forces me to add longer strings to the array as oppose to tiny strings
+    
+        oneByTen(1) = "                             "
+        oneByTen(2) = "                             "
+        oneByTen(3) = "                             "
+        oneByTen(4) = "                             "
+        oneByTen(5) = "                             "
+        oneByTen(6) = "                             "
+        oneByTen(7) = "                             "
+        oneByTen(8) = "                             "
+        oneByTen(9) = "                             "
+        oneByTen(10) = "                             "
+        ZeroOrderHeadsUp = ZeroOrderHeadsUp + 1 'keep track of number of times a zero order was filled
+        
+                        'POPULATE ADDRESS ARRAY hard code
+                sAddresses(yL, 1) = "                             " 'drop # and COD
+                sAddresses(yL, 2) = "                             " 'bag # of # and specials
+                sAddresses(yL, 3) = "                             "
+                sAddresses(yL, 4) = "               " 'BLANK
+                sAddresses(yL, 5) = "                             "
+                sAddresses(yL, 6) = "                             "
+                sAddresses(yL, 7) = "                             "
+                sAddresses(yL, 8) = "                             "
+                sAddresses(yL, 9) = "                             "
+                sAddresses(yL, 10) = "                             "
+                sAddresses(yL, 11) = "                             "
+    
+    End If
+    
+' get out of the program if NO stickers are about to be make
+
+If ZeroOrderHeadsUp = NumStickers Then
+    MsgBox ("No orders were placed for ANY of the drivers you selected, please double check your Sunday's vs Wednesday's")
+    Exit Sub
+End If
+    
+' 3.2 pop 1x10 arrary into full left array before moving on to the next one
+
+        For xL = 1 To 10
+            L(xL, yL) = oneByTen(xL) 'the L() matrix
+        Next 'xL
+
+' return to anchor
+   Application.Goto "StartCell"
+ 
+Next 'yL
+
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+
+
+'4. Add 4 spaces after every 2 in L()
+Dim yy, xx, y, sixCounter, NumStickersTimesThree As Integer ' counter keeps a 6-cycle count
+Dim LL() As String
+NumStickersTimesThree = NumStickers * 3
+ReDim LL(1 To 10, 1 To NumStickersTimesThree) As String
+xx = 1
+yy = 1
+y = 1
+sixCounter = 1
+
+
+For yy = 1 To NumStickersTimesThree ' Loop to pop LL()
+
+    ' THIS THING DOES STUFF I CANT EXPLAIN
+If sixCounter = 7 Then
+    sixCounter = 1
+End If  ' F U sixCounter!
+
+    Select Case sixCounter
+    Case 1 To 2 ' if it's the first 2 rows
+            xx = 1
+                For xx = 1 To 10 'fill all 10 columns in LL() with L() equivlant
+                    LL(xx, yy) = L(xx, y)
+                    ' LL(xx, yy) = "counter is 1 to 2. X:" + CStr(xx) + " Y:" + CStr(yy) 'L(xx, yy) ---- This was a debugger
+                Next xx
+            y = y + 1
+            sixCounter = sixCounter + 1
+            
+    Case 3 To 6  'if it's the 3rd to 6th row, make blanks
+            xx = 1
+            For xx = 1 To 10 'fill all 10 columns in LL() with BLANKS
+                LL(xx, yy) = ""
+                'LL(xx, y) = "counter is 3 to 6. X:" + CStr(xx) + " Y:" + CStr(y) 'suppose to be actual blank
+            Next xx
+            sixCounter = sixCounter + 1
+
+    End Select
+
+Next yy
+'                                                                           FYI : ADDRESS MAKER FEATURE **********************
+'------------- COUNT UNIQUE DROPS ------------------------------------------------------------
+Dim UniqueCIDDropCounter As Integer
+
+If zeroCounterDrop = 0 Then
+UniqueCIDDropCounter = UniqueItems(cIDs, True)
+Else
+UniqueCIDDropCounter = UniqueItems(cIDs, True) - 1
+End If
+
+
+'--------------------- PRINTING THE FINAL LABEL SHEET HERE via MATRIX LL() ----------------------------
+' NOT NEEDED FOR ADDRESS TAB FEATURE
+
+
+
+'--- FINAL TOUCHES ----
+' auto fit columns here
+''
+Dim a, aa As Integer
+For a = 1 To NumStickers 'vertical lopp
+    For aa = 1 To AddressTotCols 'horiztonal loop
+        Sheets(wsName2).Cells(a, aa).Value = sAddresses(a, aa)
+    Next aa
+Next a
+
+
+'final variable resets
+
+'PArt of address tab feature
+Dim AdrTabName As String
+AdrTabName = CStr(wsName2)
+Worksheets(AdrTabName).Columns.AutoFit
+
+wsName = "" 'not even sure if this worked
+wsName2 = ""
+
+' END OF ADDRESS MAKER FEATURE
+
+
+End Sub
+Sub ShowMsgv2()
+Dim i, lastOrderCol, TableVal As Integer
+lastOrderCol = 90 'hard code last column # of all order fields, see MealName Table
+
+MsgBox "Showing Messaging Column, please wait a bit"
+
+For i = 1 To lastOrderCol
+
+    TableVal = Worksheets("MealNames").Cells(41, i).Value  'row 41 msg, 42 wed, 43 sun, 44 all... see MEALNAMES TABE
+    
+    If TableVal = 1 Then ' show
+       Columns(i).EntireColumn.Hidden = False
+    ElseIf TableVal = 0 Then 'hide
+        Columns(i).EntireColumn.Hidden = True
+    Else
+        Exit For
+    End If
+Next
+
+End Sub
+Sub ShowWedv2()
+Dim i, lastOrderCol, TableVal As Integer
+lastOrderCol = 90 'hard code last column # of all order fields, see MealName Table
+
+MsgBox "Showing WED Columns, please wait a bit"
+
+For i = 1 To lastOrderCol
+
+    TableVal = Worksheets("MealNames").Cells(42, i).Value  'row 41 msg, 42 wed, 43 sun, 44 all... see MEALNAMES TABE
+    
+    If TableVal = 1 Then ' show
+       Columns(i).EntireColumn.Hidden = False
+    ElseIf TableVal = 0 Then 'hide
+        Columns(i).EntireColumn.Hidden = True
+    Else
+        Exit For
+    End If
+Next
+
+End Sub
+Sub ShowSunv2()
+Dim i, lastOrderCol, TableVal As Integer
+lastOrderCol = 90 'hard code last column # of all order fields, see MealName Table
+
+MsgBox "Showing SUN Columns, please wait a bit"
+
+For i = 1 To lastOrderCol
+
+    TableVal = Worksheets("MealNames").Cells(43, i).Value  'row 41 msg, 42 wed, 43 sun, 44 all... see MEALNAMES TABE
+    
+    If TableVal = 1 Then ' show
+       Columns(i).EntireColumn.Hidden = False
+    ElseIf TableVal = 0 Then 'hide
+        Columns(i).EntireColumn.Hidden = True
+    Else
+        Exit For
+    End If
+Next
+
+End Sub
+Sub ShowAllv2()
+Dim i, lastOrderCol, TableVal As Integer
+lastOrderCol = 90 'hard code last column # of all order fields, see MealName Table
+
+MsgBox "Showing SUN Columns, please wait a bit"
+
+For i = 1 To lastOrderCol
+
+    TableVal = Worksheets("MealNames").Cells(44, i).Value  'row 41 msg, 42 wed, 43 sun, 44 all... see MEALNAMES TABE
+    
+    If TableVal = 1 Then ' show
+       Columns(i).EntireColumn.Hidden = False
+    ElseIf TableVal = 0 Then 'hide
+        Columns(i).EntireColumn.Hidden = True
+    Else
+        Exit For
+    End If
+Next
+
+End Sub
+
+Sub SpecialsLabelMaker()
+'
+' ----------------- 2017 SPECIAL LABEL MAKER ---------------------------------------------
+'
+       ActiveCell.Select 'select the activated cell
+' 0 Get sheet name
+Dim CurrentSheet, SunOrWed As String 'get string for current sheet'
+CurrentSheet = CStr(ActiveCell.Worksheet.Name)
+' check correctness
+If CurrentSheet = "SUNSPE" Then
+    SunOrWed = "SUN"
+ElseIf CurrentSheet = "WEDSPE" Then
+    SunOrWed = "WED"
+Else
+    MsgBox "You are not in the SUNSPE or WEDSPE Tabs, please check tab spelling."
+    Exit Sub
+End If
+
+
+' 0 Batch get column numbers from correct tab
+
+Dim colCID, colMEAL, colQTY, colFULLNAME, colManualNote, colTempNote As Integer
+
+colCID = colBasedOnTitle((CurrentSheet), "CID")
+colMEAL = colBasedOnTitle((CurrentSheet), "MEAL")
+colQTY = colBasedOnTitle((CurrentSheet), "QTY")
+colFULLNAME = colBasedOnTitle((CurrentSheet), "FULL NAME")
+colManualNote = colBasedOnTitle((CurrentSheet), "Manual Note")
+colTempNote = colBasedOnTitle((CurrentSheet), "Temp Note w Special")
+
+
+'   1. Check if right cell is selected and more ------- or else exit sub
+
+If ActiveCell.Column <> 1 Then ' check first column
+    MsgBox ("Please make sure you have a Client ID (first column) selected to start")
+    Exit Sub
+ElseIf ActiveCell.Row <> 2 Then ' check 2nd row
+    MsgBox ("Please select the first row of clients' CID (cell A2) to print labels and make sure it's formated correctly")
+    Exit Sub
+End If
+
+If Application.WorksheetFunction.VLookup(ActiveCell, Worksheets("CLIENTS").Range("A:A"), 1) <> ActiveCell Then
+    MsgBox ("This Client ID is not on your CLIENTS database, please fix")
+    Exit Sub
+End If
+
+
+'1.1 Checking number of stickers and number of cell rows
+Dim colNumSpecStickers As Integer
+colNumSpecStickers = colBasedOnTitle((CurrentSheet), "Numb Stickers")
+
+Dim NumSpecStickers As Integer
+NumSpecStickers = CInt(Cells(1, colNumSpecStickers + 1).Value) 'its to the right of the row header called Numb Stickers
+' test pit error check
+' MsgBox ("number of stickers is " & NumSpecStickers)
+
+
+Dim colNumCellRows As Integer
+colNumCellRows = colBasedOnTitle((CurrentSheet), "Num Cell Rows")
+
+Dim NumCellRows As Integer
+NumCellRows = CInt(Cells(1, colNumCellRows + 1).Value) 'its to the right of the row header called Numb Stickers
+
+
+
+'1.2 Anchor the original activecell
+Range(ActiveCell.Address).Name = "StartCell"  ' Gives for example ORDERS!$A$2, I DONT KNOW HOW THIS LINE WORKS
+
+'1.3 full recalc
+
+Application.CalculateFullRebuild
+
+'2. make new worksheet, name it after SUNSPE OR WEDSPE
+Dim ws As Worksheet 'LABEL MAKER SECTION'
+Dim wsName As String
+wsName = SunOrWed + " Labels "
+' handling multiple tabs
+Dim wsSuffix As Integer
+wsSuffix = 0
+'if tab name already taken, this loops until it gets a new tab name
+    Do
+        If CheckWsNameDup(wsName) Then
+            wsSuffix = wsSuffix + 1
+                
+                If wsSuffix >= 2 Then 'delete suffix from last time if it's pass 2nd tab
+                    wsName = left(wsName, Len(wsName) - 1)
+                End If
+            
+            'adding the name with a suffix
+            wsName = wsName + CStr(wsSuffix)
+                        
+        End If
+    Loop Until CheckWsNameDup(wsName) = False
+
+    If wsSuffix = 100 Then
+            MsgBox "Got 99 tabs but a bitch aint one, if you having to many tabs plz delete some son"
+    End If
+
+'finally adding a ws as an object -   ADJUST CELL HEIGHT AND WIDTH HERE -------------------------
+Set ws = ThisWorkbook.Sheets.Add()
+ws.Name = wsName
+
+' REMINDER ------ THIS IS THE SPECIALS LABEL CODE ------
+
+'estimate from other code that a sheet in excel letter paper is 106 vba points wide
+Dim iLabelWidth, iLabelBuffer
+iLabelWidth = 23.5
+iLabelBuffer = 4
+ws.Columns("A").ColumnWidth = iLabelWidth
+ws.Columns("B").ColumnWidth = iLabelBuffer
+ws.Columns("C").ColumnWidth = iLabelWidth
+ws.Columns("D").ColumnWidth = iLabelBuffer
+ws.Columns("E").ColumnWidth = iLabelWidth
+ws.Columns("F").ColumnWidth = iLabelBuffer
+ws.Columns("G").ColumnWidth = iLabelWidth
+'estimate that sheet height is 13.21(previous code)*83 rows high =~ 1096.4
+ws.Rows.RowHeight = 39.8 '1096.4 / 20
+ws.Tab.color = 6 ' black
+
+'Page setup stuff  ------------- TAB SETUP SPECIALS PRINTER -------------------------
+With ws.PageSetup
+    .Orientation = xlPortrait
+    .Zoom = 90
+    .FirstPageNumber = 2
+    .PaperSize = xlPaperLetter
+    .LeftMargin = Application.CentimetersToPoints(0.9)
+    .RightMargin = Application.CentimetersToPoints(0.3)
+    .TopMargin = Application.CentimetersToPoints(1.35)
+    .BottomMargin = Application.CentimetersToPoints(0.7)
+    .HeaderMargin = Application.InchesToPoints(0.1)
+    .FooterMargin = Application.InchesToPoints(0.1)
+    .PrintGridlines = False
+    
+End With
+
+Worksheets(wsName).Columns("A:G").ShrinkToFit = True
+Worksheets(wsName).Columns("A:G").VerticalAlignment = xlCenter
+Worksheets(wsName).Columns("A:G").HorizontalAlignment = xlCenter
+Worksheets(wsName).Columns("A:G").Font.Size = "14"
+
+
+'go back to startcell
+Application.Goto "StartCell"
+
+
+' 3. MAKE LEFT ARRAY of v------ THIS IS THE SPECIALS STICKERS PRINTER CODE
+
+' COLUMNS: CID | MEAL | QTY | FULL NAME | Manual Note | Temp Note w Special
+Dim iLastCol As Integer
+iLastCol = 4  'Hard code this, bc we should minimize # columns of data that should be suffice
+
+Dim sCapture() As String
+ReDim sCapture(1 To NumSpecStickers + 4, 1 To iLastCol) As String
+
+Dim iColCapt, iRowCapt, iQTY, iCheckBlank, iQTYcounter, iQTYoffest, iQTYoffestTemp As Integer 'Imp variables
+iQTYoffest = 0
+iQTYoffestTemp = 0
+
+    
+
+'THIS IS LEFT ARRAY, but making some code cleaning before hand
+'sumif totals FIRST ROW code
+Dim FirstSumIf As Integer
+Dim FirstSumIfCrit As String
+Dim SumIfRange As Range
+
+'get the "A1" meal name from the 2nd row right away
+FirstSumIfCrit = CStr(ActiveCell(1, 2).Value)
+
+'use sumif to get the first sum > RANGE, CRITERIA, SUMRANGE
+FirstSumIf = CInt(Application.WorksheetFunction.SumIf(Worksheets((CurrentSheet)).Range("B2:B50"), FirstSumIfCrit, Worksheets((CurrentSheet)).Range("C2:C50")))
+
+sCapture(1, 4) = FirstSumIfCrit & " (" & FirstSumIf & ") -->" ' pop the first row of sCap right away with the meal code above the client names
+
+'sumif totals dynamic for loop code
+Dim iSumIf As Integer
+Dim iTopRange, iBotRange As Integer 'for the top and bottom rows
+Dim sSumCrit As String
+Dim rSumRng, rSumCritRng As Range
+Dim sTempp1, sTempp2 As String
+
+
+
+For iRowCapt = 2 To NumCellRows '2 to SKIP to the second row of the CELL VALUES
+              
+            iColCapt = 4 'do everything in the 4th column of the array for now
+            
+            'get QTY of the same row
+            iQTY = CInt(ActiveCell(iRowCapt - 1, 3).Value)
+            
+            If iQTY = 1 And iQTYoffestTemp = 0 Then 'insert the CLIENT name
+                sCapture(iRowCapt + iQTYoffest, iColCapt) = CStr(ActiveCell(iRowCapt - 1, iColCapt).Value) '-1 bc active cell starts 1 cell down already
+
+            ElseIf iQTY = 0 And iQTYoffestTemp = 0 Then 'insert MEAL name
+                
+                'get the MEAL NAME, it's the same thing as Sumif CRITERIA
+                sSumCrit = CStr(ActiveCell((iRowCapt + 1 - 1), 2).Value)  '+1 to get the next meal code, -1 becase active cell starts 1 cell down already
+                
+                'Dim r As Range: Set r = Range("B3")
+
+                'get the sumif... using a dynamic range... the top of the range shall start at iRowCap
+                'sTempp1 = CStr("B" & iRowCapt & ":B" & (iRowCapt + 50))
+                'sTempp2 = CStr("C" & iRowCapt & ":C" & (iRowCapt + 50))
+                'Set rSumRng = Range(Cells(iRowCapt, 2), Cells) 'the inspection range is on the B column
+                'Set rSumCritRng = Range(sTempp2) 'C Column
+                
+                'use sumif to get the  sumif : RANGE, CRITERIA, SUMRANGE
+                iSumIf = CInt(Application.WorksheetFunction.SumIf(Worksheets((CurrentSheet)).Range("B" & iRowCapt & ":B" & (iRowCapt + 50)), sSumCrit, Worksheets((CurrentSheet)).Range("C" & iRowCapt & ":C" & (iRowCapt + 50))))
+            
+                sCapture(iRowCapt + iQTYoffest, iColCapt) = sSumCrit & " (" & iSumIf & ") -->"
+            
+            ElseIf iQTY > 1 Then 'it's a multiple QTY, now we have to offset the sCap counters, and also tell the beginning
+                                            'of the loop to skip taking in the iQTY until this process is done
+                
+                'first we capture the correct data with the QTY:
+                 For iQTYcounter = 0 To (iQTY - 1) '0 to not overlap, -1 to not over count by 1
+                            ' for example, lets say QTY was 3, then...
+                            ' 0 iQTYcounter --- capture all data similar as before
+                            ' 1 iQTYcounter --- captures the data into the next row in sCapture
+                            ' 2 iQTYcounter --- same
+                            sCapture((iRowCapt + iQTYcounter + iQTYoffest), iColCapt) = CStr(ActiveCell(iRowCapt - 1, iColCapt).Value) '-1 bc active cell starts 1 cell down alreay
+                Next iQTYcounter
+                
+                'second we keep some trackers:
+                            iQTYoffest = iQTYoffest + iQTY - 1 'this basically keeps a counter of all the rows added by QTY for this run
+                            iQTYoffestTemp = iQTY - 1 'temp counter, tells the QTY checker to know when to SKIPS its counting
+            
+            ElseIf iQTYoffestTemp > 0 Then
+                iQTYoffestTemp = iQTYoffestTemp - 1 'this eventually goes to zero
+                'iRowCapt then must NOT MOVE on until iQTYoffestTemp is 0
+                iRowCapt = iRowCapt - 1
+                
+
+            Else
+                    MsgBox ("ERROR, check QTY values and formatting")
+                    Exit Sub
+            End If
+
+Next iRowCapt  'DONE, test pit passed 12:07pm; this produces a simple array on sCapture on the 4th column which is exactly what's needed
+
+      
+
+' 4. MAKE RIGHT ARRAY
+
+Dim iOutputColMax, iOutputRowMax As Integer
+iOutputColMax = 4 ' HARD CODE, this the particular sheet Andrei uses
+iOutputRowMax = CInt(Application.WorksheetFunction.RoundUp((NumSpecStickers / 4), 0))
+'^-- the total of number of stickers divided by 4 rounded up
+
+Dim sOutput() As String
+ReDim sOutput(1 To iOutputRowMax, 1 To iOutputColMax) As String 'dim the ARRAY
+
+' 5.  PUT LEFT INTO RIGHT ARRAY
+
+'LEFT ARRAY VARIALBES:  ( iLastCol, NumSpecStickers = Caps)  ( iColCapt, iRowCapt = counters)
+' ReDim sCapture(1 To NumSpecStickers, 1 To iLastCol) As String
+' cid     meal QTY  name
+' 2343  A1   1 peter
+
+' 2342  A1   2 paul
+' 4352  A1   3  zayed
+'
+
+'RIGHT ARRAY VARIABLES:  ( iOutputColMax, iOutputRowMax = Caps)  ( counters not needed )
+'ReDim sOutput(1 To iOutputRowMax, 1 To iOutputColMax) As String
+'   1    2    3    4
+'   1    2    3    4
+'   1    2    3    4
+'
+' ARRAY CONVERTER
+Dim iRowOut, iColOut As Integer
+
+iRowCapt = 1
+                For iRowOut = 1 To iOutputRowMax
+                        For iColOut = 1 To iOutputColMax
+                            sOutput(iRowOut, iColOut) = CStr(sCapture(iRowCapt, 4))
+                            iRowCapt = iRowCapt + 1
+                        Next iColOut
+                Next iRowOut
+
+            
+' 5.1 - PRINTING DATA
+
+For iRowOut = 1 To iOutputRowMax
+    iColOut = 1
+        Sheets(wsName).Cells(iRowOut, 1).Value = sOutput(iRowOut, iColOut)  ' TESTING passed 7:52 PM, it printed the correct # of stickers in a 4 column grid
+Next iRowOut
+
+For iRowOut = 1 To iOutputRowMax
+    iColOut = 2
+        Sheets(wsName).Cells(iRowOut, 3).Value = sOutput(iRowOut, iColOut)  ' TESTING passed 7:52 PM, it printed the correct # of stickers in a 4 column grid
+Next iRowOut
+
+For iRowOut = 1 To iOutputRowMax
+    iColOut = 3
+        Sheets(wsName).Cells(iRowOut, 5).Value = sOutput(iRowOut, iColOut)  ' TESTING passed 7:52 PM, it printed the correct # of stickers in a 4 column grid
+Next iRowOut
+
+For iRowOut = 1 To iOutputRowMax
+    iColOut = 4
+        Sheets(wsName).Cells(iRowOut, 7).Value = sOutput(iRowOut, iColOut)  ' TESTING passed 7:52 PM, it printed the correct # of stickers in a 4 column grid
+Next iRowOut
+
+
+'TESTING PIT 2 - print LEFT array as is
+'For iColCapt = 1 To iLastCol 'hard coded last column
+ '   For iRowCapt = 1 To NumSpecStickers 'NumSpecStickers 'numb of special stickers
+  '      Sheets(wsName).Cells(iRowCapt, iColCapt).Value = sCapture(iRowCapt, iColCapt)
+   ' Next iRowCapt 'ROW
+'Next iColCapt 'COL
+'------ end of test pit 2
+
+
+
+
+
+' end of the SPECIALS PRINTER CODE
+End Sub
+
+
+'2019 Order Filter Function'
+Function OrderFilter(s, sFilter) As String
+s = CStr(s)
+sFilter = CStr(sFilter)
+
+'Dim aOutput As String 'string, but the split function would return it as an Array anyway'
+Dim iInputLen As Integer
+iInputLen = Len(s)
+
+Dim tempHolder As String
+Dim tempCleaner As String
+Dim sOutputNoPeriod As String
+Dim aOutput() As String
+
+ReDim aOutput(0 To iInputLen)
+
+
+If iInputLen > 2 Then 'in some cases the length of input s will be NULL (i think) so this is a 2nd gatekeep'
+'clean up the sInput string of extra spaces, just in case, and using the SPLIT function to populate an array'
+Dim temp As String
+    'typical order string will be A1x2  A2x2  A3x2'
+    Do
+        temp = s
+        s = Replace(s, "  ", " ") 'remove 2 white spaces with 1 white space
+    Loop Until temp = s
+    
+    s = Trim(s)
+    aOutput = Split(s) 'split into array
+
+
+    For Each Output In aOutput() 'put each array item into temp holder... ".A1 .A2 .A3"
+
+        'replace all .'s with "", then analyze the first character of the temp holder
+        
+        sOutputNoPeriod = Replace(Output, ".", "")
+
+        If left(sOutputNoPeriod, 1) = sFilter Then 'if the first left char of this string matches the filter letter, then put this output piece into tempholder'
+            tempHolder = tempHolder + " " + sOutputNoPeriod
+        End If
+
+    Next
+
+OrderFilter = tempHolder
+
+End If
+
+    
+End Function
+
+Function OrderExcludeFilter(s, sExclude1, sExclude2, sExclude3, sExclude4) As String
+s = CStr(s)
+sExclude1 = CStr(sExclude1)
+sExclude2 = CStr(sExclude2)
+sExclude3 = CStr(sExclude3)
+sExclude4 = CStr(sExclude4)
+
+'Dim aOutput As String 'string, but the split function would return it as an Array anyway'
+Dim iInputLen As Integer
+iInputLen = Len(s)
+
+Dim tempHolder As String
+Dim tempCleaner As String
+Dim sOutputNoPeriod As String
+Dim aOutput() As String
+
+ReDim aOutput(0 To iInputLen)
+
+
+If iInputLen > 2 Then 'in some cases the length of input s will be NULL (i think) so this is a 2nd gatekeep'
+'clean up the sInput string of extra spaces, just in case, and using the SPLIT function to populate an array'
+Dim temp As String
+    'typical order string will be A1x2  A2x2  A3x2'
+    Do
+        temp = s
+        s = Replace(s, "  ", " ") 'remove 2 white spaces with 1 white space
+    Loop Until temp = s
+    
+    s = Trim(s)
+    aOutput = Split(s) 'split into array
+
+
+    For Each Output In aOutput() 'put each array item into temp holder... ".A1 .A2 .A3"
+
+        'replace all .'s with "", then analyze the first character of the temp holder
+        
+        sOutputNoPeriod = Replace(Output, ".", "")
+
+        '******** KEY DIFFERENCE WITH THE EXCLUDE FILTER, we ONLY ACCEPT the array output item if it does NOT have the exclude filters in the first letters'
+        If left(sOutputNoPeriod, 1) <> sExclude1 And left(sOutputNoPeriod, 1) <> sExclude2 And left(sOutputNoPeriod, 1) <> sExclude3 And left(sOutputNoPeriod, 1) <> sExclude4 Then 'if the first left char of this string matches the filter letter, then put this output piece into tempholder'
+            tempHolder = tempHolder + " " + sOutputNoPeriod
+        End If
+
+    Next
+
+OrderExcludeFilter = tempHolder
+
+End If
+
+    
+End Function
+
+
+
+
+
+
+
+
+
+
+
+
+
